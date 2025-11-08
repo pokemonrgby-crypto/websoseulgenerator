@@ -1,58 +1,45 @@
-<!-- /index.html -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>웹소설 생성기</title>
+    <title>AI 웹소설 생성기 (V3)</title>
     <style>
-        /* 기본 스타일 - 모바일 우선 반응형 디자인 */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #3a1c71 0%, #d76d77 50%, #ffaf7b 100%);
             min-height: 100vh;
             padding: 20px;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
         }
-
         .container {
-            background: white;
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 16px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             padding: 30px;
-            max-width: 800px;
+            max-width: 900px;
             width: 100%;
+            margin-top: 30px;
         }
-
         h1 {
             color: #333;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             text-align: center;
             font-size: 28px;
+            font-weight: 700;
         }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
+        .form-group { margin-bottom: 20px; }
         label {
             display: block;
             margin-bottom: 8px;
-            color: #555;
+            color: #444;
             font-weight: 600;
             font-size: 14px;
         }
-
-        input[type="password"],
-        textarea {
+        input[type="password"], textarea {
             width: 100%;
             padding: 12px;
             border: 2px solid #e0e0e0;
@@ -61,126 +48,125 @@
             transition: border-color 0.3s;
             font-family: inherit;
         }
-
-        input[type="password"]:focus,
-        textarea:focus {
+        input[type="password"]:focus, textarea:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #d76d77;
         }
-
         textarea {
-            min-height: 120px;
+            min-height: 100px;
             resize: vertical;
+            background: #fafafa;
         }
-
+        .db-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .scene-request { min-height: 120px; }
         button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #d76d77 0%, #ffaf7b 100%);
             color: white;
             border: none;
-            padding: 12px 24px;
+            padding: 14px 28px;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            margin-right: 10px;
-            margin-bottom: 10px;
+            transition: all 0.3s;
+            width: 100%;
         }
-
         button:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(215, 109, 119, 0.4);
         }
-
-        button:active:not(:disabled) {
-            transform: translateY(0);
-        }
-
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
         button.secondary {
             background: #6c757d;
+            width: auto;
+            padding: 10px 15px;
+            font-size: 14px;
         }
-
-        button.secondary:hover:not(:disabled) {
-            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
-        }
-
-        .button-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
         pre {
-            background: #f5f5f5;
+            background: #f0f0f0;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             padding: 16px;
             overflow-x: auto;
             white-space: pre-wrap;
             word-wrap: break-word;
-            font-size: 13px;
+            font-size: 14px;
             line-height: 1.6;
-            max-height: 400px;
+            max-height: 500px;
             overflow-y: auto;
+            margin-top: 10px;
         }
-
-        .result-container {
-            margin-top: 20px;
-        }
-
-        @media (max-width: 600px) {
-            .container {
-                padding: 20px;
-            }
-
-            h1 {
-                font-size: 24px;
-            }
-
-            button {
-                width: 100%;
-                margin-right: 0;
-            }
+        .key-group { display: flex; gap: 10px; align-items: center; }
+        .key-group input { flex-grow: 1; }
+        
+        @media (max-width: 768px) {
+            .db-grid { grid-template-columns: 1fr; }
+            .container { padding: 20px; }
+            h1 { font-size: 24px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎭 웹소설 생성기</h1>
+        <h1>🎭 AI 웹소설 생성기 (V3)</h1>
         
         <div class="form-group">
             <label for="secretKey">경비실 문 열쇠 (MY_SECRET_KEY)</label>
-            <input type="password" id="secretKey" placeholder="개인 인증 키를 입력하세요">
+            <div class="key-group">
+                <input type="password" id="secretKey" placeholder="개인 인증 키">
+                <button id="saveKeyButton" class="secondary">🔑 저장</button>
+            </div>
+        </div>
+
+        <hr style="border: 0; height: 1px; background: #e0e0e0; margin: 30px 0;">
+
+        <h2>📚 세계관 데이터베이스</h2>
+        
+        <div class="form-group">
+            <label for="worldviewDb">세계관 (Worldview)</label>
+            <textarea id="worldviewDb" placeholder="시대 배경, 마법/기술 규칙, 고유 용어 등"></textarea>
+        </div>
+
+        <div class="db-grid">
+            <div class="form-group">
+                <label for="charactersDb">캐릭터 (Characters)</label>
+                <textarea id="charactersDb" placeholder="[주인공A]&#10;성격: 냉소적&#10;말투: 짧게 끊어 말함. '..., ...그런가.'&#10;외형: 흑발, 흑안"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="locationsDb">장소 (Locations)</label>
+                <textarea id="locationsDb" placeholder="[A 장소]&#10;설명: 마력이 넘치는 숲&#10;사건: 주인공이 처음 각성한 곳"></textarea>
+            </div>
         </div>
 
         <div class="form-group">
-            <button id="saveKeyButton" class="secondary">🔑 열쇠 저장하기</button>
+            <label for="plotDb">관계도 및 사건 (Plot Points)</label>
+            <textarea id="plotDb" placeholder="[관계]&#10;A -> B (불신)&#10;[사건]&#10;1. A가 B를 만남&#10;2. ..."></textarea>
         </div>
+
+        <hr style="border: 0; height: 1px; background: #e0e0e0; margin: 30px 0;">
+
+        <h2>🎬 씬 생성 요청</h2>
 
         <div class="form-group">
-            <label for="promptInput">소설 프롬프트</label>
-            <textarea id="promptInput" placeholder="생성하고 싶은 소설의 내용을 자유롭게 입력하세요..."></textarea>
+            <label for="sceneRequest">이번에 생성할 씬 (Scene Request)</label>
+            <textarea id="sceneRequest" class="scene-request" placeholder="이 설정으로 씬 생성: &#10;[A 장소]에서 [주인공A]가 [B]와 대화한다. A는 B를 떠보려고 한다."></textarea>
         </div>
 
-        <div class="button-group">
-            <button id="geminiButton">✨ Gemini로 기획하기</button>
-        </div>
+        <button id="generateButton">✨ 씬 생성하기 (3단계)</button>
 
-        <div class="result-container">
+        <div class="result-container" style="margin-top: 20px;">
             <label>결과</label>
-            <pre id="result">여기에 결과가 표시됩니다.</pre>
+            <pre id="result">여기에 최종 한국어 본문이 표시됩니다.</pre>
         </div>
     </div>
 
     <script>
         // /index.html - JavaScript 로직
         
-        // 페이지 로드 시 localStorage에서 키를 불러와 입력창에 채움
         window.addEventListener('DOMContentLoaded', () => {
             const savedKey = localStorage.getItem('MY_SECRET_KEY');
             if (savedKey) {
@@ -188,7 +174,6 @@
             }
         });
 
-        // 열쇠 저장 버튼 클릭 이벤트
         document.getElementById('saveKeyButton').addEventListener('click', () => {
             const secretKey = document.getElementById('secretKey').value.trim();
             if (!secretKey) {
@@ -199,32 +184,38 @@
             alert('경비실 문 열쇠가 저장되었습니다! 🔑');
         });
 
-        // Gemini 버튼 클릭 이벤트
-        document.getElementById('geminiButton').addEventListener('click', async () => {
-            const button = document.getElementById('geminiButton');
+        document.getElementById('generateButton').addEventListener('click', async () => {
+            const button = document.getElementById('generateButton');
             const resultElement = document.getElementById('result');
             const secretKey = localStorage.getItem('MY_SECRET_KEY');
-            const prompt = document.getElementById('promptInput').value.trim();
+            
+            // 1. 데이터 수집
+            const sceneRequest = document.getElementById('sceneRequest').value.trim();
+            const worldviewDatabase = {
+                world: document.getElementById('worldviewDb').value.trim(),
+                chars: document.getElementById('charactersDb').value.trim(),
+                locs: document.getElementById('locationsDb').value.trim(),
+                plot: document.getElementById('plotDb').value.trim()
+            };
 
-            // 키가 없으면 중단
+            // 2. 유효성 검사
             if (!secretKey) {
                 alert('먼저 경비실 문 열쇠를 저장해주세요!');
                 return;
             }
-
-            // 프롬프트가 없으면 중단
-            if (!prompt) {
-                alert('소설 프롬프트를 입력해주세요!');
+            if (!sceneRequest) {
+                alert('씬 생성 요청을 입력해주세요!');
                 return;
             }
 
-            // [2025-10-19] 지침: 버튼 즉시 비활성화 및 텍스트 변경
+            // 3. [2025-10-19] 지침: 버튼 비활성화 및 텍스트 변경
             const originalText = button.textContent;
             button.disabled = true;
-            button.textContent = '생성 중...';
+            button.textContent = '생성 중... (1/3 기획 중)';
+            resultElement.textContent = '생성을 시작합니다... (1/3 기획)';
 
             try {
-                // 백엔드 API 호출
+                // 4. 백엔드 API 호출 (3단계 파이프라인)
                 const response = await fetch('/api/generate', {
                     method: 'POST',
                     headers: {
@@ -232,10 +223,15 @@
                         'x-my-secret-key': secretKey
                     },
                     body: JSON.stringify({
-                        target: 'gemini',
-                        prompt: prompt
+                        sceneRequest: sceneRequest,
+                        worldviewDatabase: worldviewDatabase
                     })
                 });
+
+                // 중간 상태 업데이트 콜백 (실제 구현 시 WebSocket이나 SSE 사용 권장)
+                // 여기서는 fetch가 완료될 때까지 기다림
+                // button.textContent = '생성 중... (2/3 집필 중)';
+                // button.textContent = '생성 중... (3/3 번역 중)';
 
                 if (!response.ok) {
                     if (response.status === 401) {
@@ -247,9 +243,9 @@
 
                 const data = await response.json();
                 
-                // 결과 표시
-                if (data.text || data.result) {
-                    resultElement.textContent = data.text || data.result || JSON.stringify(data, null, 2);
+                // 5. 결과 표시
+                if (data.text) {
+                    resultElement.textContent = data.text;
                 } else {
                     resultElement.textContent = JSON.stringify(data, null, 2);
                 }
@@ -259,7 +255,7 @@
                 resultElement.textContent = `오류 발생:\n${error.message}`;
                 alert(`오류: ${error.message}`);
             } finally {
-                // 요청 완료 후 버튼 복구
+                // 6. [2025-10-19] 지침: 버튼 복구
                 button.disabled = false;
                 button.textContent = originalText;
             }
