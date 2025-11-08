@@ -1,0 +1,269 @@
+<!-- /index.html -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>웹소설 생성기</title>
+    <style>
+        /* 기본 스타일 - 모바일 우선 반응형 디자인 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="password"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+            font-family: inherit;
+        }
+
+        input[type="password"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.secondary:hover:not(:disabled) {
+            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        pre {
+            background: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 13px;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-container {
+            margin-top: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            button {
+                width: 100%;
+                margin-right: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎭 웹소설 생성기</h1>
+        
+        <div class="form-group">
+            <label for="secretKey">경비실 문 열쇠 (MY_SECRET_KEY)</label>
+            <input type="password" id="secretKey" placeholder="개인 인증 키를 입력하세요">
+        </div>
+
+        <div class="form-group">
+            <button id="saveKeyButton" class="secondary">🔑 열쇠 저장하기</button>
+        </div>
+
+        <div class="form-group">
+            <label for="promptInput">소설 프롬프트</label>
+            <textarea id="promptInput" placeholder="생성하고 싶은 소설의 내용을 자유롭게 입력하세요..."></textarea>
+        </div>
+
+        <div class="button-group">
+            <button id="geminiButton">✨ Gemini로 기획하기</button>
+        </div>
+
+        <div class="result-container">
+            <label>결과</label>
+            <pre id="result">여기에 결과가 표시됩니다.</pre>
+        </div>
+    </div>
+
+    <script>
+        // /index.html - JavaScript 로직
+        
+        // 페이지 로드 시 localStorage에서 키를 불러와 입력창에 채움
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedKey = localStorage.getItem('MY_SECRET_KEY');
+            if (savedKey) {
+                document.getElementById('secretKey').value = savedKey;
+            }
+        });
+
+        // 열쇠 저장 버튼 클릭 이벤트
+        document.getElementById('saveKeyButton').addEventListener('click', () => {
+            const secretKey = document.getElementById('secretKey').value.trim();
+            if (!secretKey) {
+                alert('경비실 문 열쇠를 입력해주세요!');
+                return;
+            }
+            localStorage.setItem('MY_SECRET_KEY', secretKey);
+            alert('경비실 문 열쇠가 저장되었습니다! 🔑');
+        });
+
+        // Gemini 버튼 클릭 이벤트
+        document.getElementById('geminiButton').addEventListener('click', async () => {
+            const button = document.getElementById('geminiButton');
+            const resultElement = document.getElementById('result');
+            const secretKey = localStorage.getItem('MY_SECRET_KEY');
+            const prompt = document.getElementById('promptInput').value.trim();
+
+            // 키가 없으면 중단
+            if (!secretKey) {
+                alert('먼저 경비실 문 열쇠를 저장해주세요!');
+                return;
+            }
+
+            // 프롬프트가 없으면 중단
+            if (!prompt) {
+                alert('소설 프롬프트를 입력해주세요!');
+                return;
+            }
+
+            // [2025-10-19] 지침: 버튼 즉시 비활성화 및 텍스트 변경
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = '생성 중...';
+
+            try {
+                // 백엔드 API 호출
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-my-secret-key': secretKey
+                    },
+                    body: JSON.stringify({
+                        target: 'gemini',
+                        prompt: prompt
+                    })
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error('인증 실패: 경비실 문 열쇠가 올바르지 않습니다.');
+                    }
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `요청 실패: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // 결과 표시
+                if (data.text || data.result) {
+                    resultElement.textContent = data.text || data.result || JSON.stringify(data, null, 2);
+                } else {
+                    resultElement.textContent = JSON.stringify(data, null, 2);
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                resultElement.textContent = `오류 발생:\n${error.message}`;
+                alert(`오류: ${error.message}`);
+            } finally {
+                // 요청 완료 후 버튼 복구
+                button.disabled = false;
+                button.textContent = originalText;
+            }
+        });
+    </script>
+</body>
+</html>
