@@ -9,6 +9,39 @@ const ALLOWED_MODELS = new Set([
   'novelai'
 ]);
 
+// NovelAI 최신/최상 모델 설정 (환경변수로 관리)
+const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'kayra-v1';
+const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '4000', 10);
+
+// 지수 백오프 재시도 함수
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.ok) return response;
+      
+      // 429 또는 5xx 에러 시 재시도
+      if (response.status === 429 || response.status >= 500) {
+        if (i < maxRetries - 1) {
+          const delay = Math.pow(2, i) * 1000; // 1s, 2s, 4s
+          console.log(`재시도 대기 중 (${i + 1}/${maxRetries}): ${delay}ms`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+      return response;
+    } catch (err) {
+      if (i < maxRetries - 1) {
+        const delay = Math.pow(2, i) * 1000;
+        console.log(`네트워크 오류 재시도 (${i + 1}/${maxRetries}): ${delay}ms`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 export default async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -46,12 +79,21 @@ export default async function handler(req, res) {
       const modelName = model;
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
 
-      const gRes = await fetch(geminiUrl, {
+      // 안전 필터 적용
+      const safetySettings = [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
+      ];
+
+      const gRes = await fetchWithRetry(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.9, maxOutputTokens: 2048 }
+          generationConfig: { temperature: 0.9, maxOutputTokens: 8192 },
+          safetySettings: safetySettings
         })
       });
 
@@ -72,7 +114,7 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: '서버 설정 오류: NovelAI API 키가 없습니다.' });
       }
       const naiUrl = 'https://api.novelai.net/ai/generate';
-      const nRes = await fetch(naiUrl, {
+      const nRes = await fetchWithRetry(naiUrl, {
         method:'POST',
         headers:{
           'Content-Type':'application/json',
@@ -80,8 +122,11 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           input: prompt,
-          model: 'kayra-v1',                 // 필요 시 변경
-          parameters: { temperature: 1.0, max_length: 500 }
+          model: NAI_LATEST_MODEL,  // 환경변수로 관리되는 최신/최상 모델
+          parameters: { 
+            temperature: 1.0, 
+            max_length: NAI_MAX_LENGTH  // 3000-4000자 목표 (환경변수)
+          }
         })
       });
       if (!nRes.ok) {

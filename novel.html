@@ -1,3 +1,4 @@
+<!-- /novel.html -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -47,10 +48,10 @@
 
     <div>
       <select id="pipelineStage" style="margin-right:8px;">
-        <option value="SKETCH">기획(Flash)</option>
-        <option value="J_DRAFT">본작성(NAI/일본어)</option>
-        <option value="J_POLISH">다듬기(NAI/일본어)</option>
-        <option value="TRANSLATE_KO">번역(G2.5 Pro)</option>
+        <option value="SKETCH">기획 (Flash-lite)</option>
+        <option value="J_DRAFT">본작성 (NAI/일본어/3000-4000자)</option>
+        <option value="J_POLISH">다듬기 (NAI/일본어)</option>
+        <option value="TRANSLATE_KO">번역 (Gemini 2.5 Pro/일→한)</option>
       </select>
       <button id="generateSceneButton">✨ 실행</button>
       <button id="copyJapaneseButton" class="sub-ai" style="margin-left:8px;">🧷 원문(일본어) 복사</button>
@@ -74,7 +75,7 @@
     </fieldset>
 
     <fieldset style="border:1px solid #ddd;border-radius:12px;padding:12px;">
-      <legend>편의 프롬프트(Flash)</legend>
+      <legend>편의 프롬프트 (Flash-lite)</legend>
       <textarea id="proxyPrompt" rows="4" placeholder="빠른 질문/요약 등"></textarea>
       <button id="proxyButton" class="sub-ai">보내기</button>
       <pre id="proxyResult" style="background:#f6f6f6;padding:8px;border-radius:8px;"></pre>
@@ -103,22 +104,69 @@
   // 파이프라인 & 모델 매핑
   let lastJapaneseDraft = "";
   const MODEL_FOR = {
-    SKETCH: 'gemini-2.5-flash',
-    J_DRAFT: 'novelai',
-    J_POLISH: 'novelai',
-    TRANSLATE_KO: 'gemini-2.5-pro'
+    SKETCH: 'gemini-2.5-flash-lite',  // 스케치 개요
+    J_DRAFT: 'novelai',                // 본문 초안 (일본어) - NovelAI 최신 모델
+    J_POLISH: 'novelai',               // 다듬기 (일본어) - NovelAI 최신 모델
+    TRANSLATE_KO: 'gemini-2.5-pro'     // 번역 (일→한) - Gemini 2.5 Pro
   };
 
   function buildPrompt(stage, userText){
     switch(stage){
       case 'SKETCH':
-        return `너는 웹소설 기획 보조야. 아래 요구를 간결한 장면 개요(갈등/전환/후폭풍)로 정리해줘.\n요구:\n${userText}`;
+        // 스케치: 갈등→전환→후폭풍 3단 구조 개요 생성
+        return `너는 웹소설 기획 보조야. 아래 요구사항을 갈등→전환→후폭풍 3단 구조로 정리해줘.
+각 단계별로 5-8문장씩 작성하고, 다음 항목을 포함해:
+- 개요 (장면 흐름)
+- 핵심 도구/소품
+- 감정 변화
+- 다음 장면 훅
+
+요구사항:
+${userText}`;
       case 'J_DRAFT':
-        return `以下の要件に従って、日本語で小説の本文を執筆してください。\n- 文体: 読みやすく、臨場感を重視\n- 禁止: 不要な英語混在、過度なルビ\n- 長さ: ${Math.min(900, Math.max(400, userText.length))}～1200字程度\n要件:\n${userText}`;
+        // 본문 초안: 일본어로 3000-4000자 웹소설 생성
+        return `以下の要件に従って、日本語でウェブ小説の本文を執筆してください。
+
+【必須要件】
+- 文字数: 3,000～4,000字を目標とする
+- 改行: 必ず \\n を使用 (プラットフォーム互換性)
+- 文体: ウェブ小説らしく会話を中心に、文ごとの改行を積極的に活用
+- 効果音(SFX): セリフの外の地の文で表記 (例: 【SFX】～～)
+- 固有名詞・口調: 一貫性を保つ
+- トーン/演出: 場面の目的を明確に、感情線/葛藤-転換-余韻の流れを維持
+
+【要件】
+${userText}
+
+【禁止事項】
+- 不必要な英語の混在
+- 過度なルビの使用
+- サービスポリシー違反 (暴力表現・個人情報・差別表現の禁止)`;
       case 'J_POLISH':
-        return `次の日本語テキストを、文体とリズムを整えて推敲してください。意味は変えず、冗長さを減らして自然な地の文にしてください。\n---\n${userText}`;
+        // 일본어 다듬기: 의미 유지하며 문장 개선
+        return `次の日本語のウェブ小説本文を推敲してください。
+
+【推敲の方針】
+- 意味は変えない
+- 冗長な表現を削除
+- 文のリズムと呼吸感を改善
+- 口調の一貫性を保つ
+- 長さは ±10% 以内で自然に調整
+
+【本文】
+${userText}`;
       case 'TRANSLATE_KO':
-        return `다음 일본어 소설 본문을 자연스럽고 문학적인 한국어로 번역해줘.\n- 말맛/톤 유지, 과한 의역 금지\n- 일본어 고유명사는 필요시 ()로 한 번 병기\n---\n${userText}`;
+        // 번역: 일본어→한국어 자연스럽게
+        return `다음 일본어 웹소설 본문을 자연스럽고 문학적인 한국어로 번역해줘.
+
+【번역 원칙】
+- 말맛/톤 유지, 과한 의역 금지
+- 일본어 고유명사는 첫 등장 시에만 (원문) 병기
+- 웹소설답게 대화와 줄바꿈 살리기
+- 효과음(SFX) 표기 유지
+
+【일본어 본문】
+${userText}`;
       default:
         return userText;
     }
@@ -192,20 +240,23 @@
     alert('회차 DB 저장 완료!');
   });
 
-  // 편의 프롬프트(Flash)
+  // 편의 프롬프트(Flash-lite)
   const proxyBtn=document.getElementById('proxyButton');
   const proxyResultEl=document.getElementById('proxyResult');
   proxyBtn.addEventListener('click', async ()=>{
     const prompt=document.getElementById('proxyPrompt').value;
     if(!secretKey || !prompt) return alert('키 또는 프롬프트가 없어.');
     proxyBtn.disabled=true;
+    const oldText = proxyBtn.textContent;
+    proxyBtn.textContent = '전송 중...';
     try{
-      const data=await callProxy('gemini-2.5-flash', prompt, secretKey);
+      const data=await callProxy('gemini-2.5-flash-lite', prompt, secretKey);
       proxyResultEl.textContent=data.text||'';
     }catch(e){
       proxyResultEl.textContent=`오류: ${e.message}`;
     }finally{
       proxyBtn.disabled=false;
+      proxyBtn.textContent = oldText;
     }
   });
 
