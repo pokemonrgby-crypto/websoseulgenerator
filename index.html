@@ -2,299 +2,105 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale-1.0">
-    <title>AI 웹소설 집필 도구 (V4)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 소설 목록 (V5)</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f0f2f5;
-            padding: 20px;
-        }
-        .container {
-            background: #ffffff;
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f0f2f5;
             padding: 30px;
-            max-width: 1200px;
-            width: 100%;
-            margin: 30px auto;
         }
-        h1, h2 {
-            color: #333;
-            margin-bottom: 20px;
+        h1 {
             text-align: center;
+            color: #333;
+            margin-bottom: 30px;
         }
-        h1 { font-size: 28px; }
-        h2 { font-size: 22px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        
-        .layout-grid {
+        .novel-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
         }
-        
-        .form-group { margin-bottom: 20px; }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #444;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        input[type="text"], input[type="password"], textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-            font-family: inherit;
-        }
-        input:focus, textarea:focus {
-            outline: none;
-            border-color: #007aff;
-        }
-        textarea {
-            min-height: 200px;
-            resize: vertical;
-            background: #fafafa;
-            font-family: 'Courier New', Courier, monospace;
-        }
-        
-        button {
-            background: #007aff;
-            color: white;
-            border: none;
-            padding: 14px 28px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            width: 100%;
-        }
-        button:hover:not(:disabled) {
-            background: #005bb5;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2);
-        }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-        button.secondary {
-            background: #6c757d;
-            width: auto;
-            padding: 10px 15px;
-            font-size: 14px;
-        }
-
-        /* [수정] 블록 단위 출력 영역 */
-        #result-blocks {
+        .novel-card, .add-card {
             background: #fff;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 10px;
-            min-height: 200px;
-            max-height: 600px;
-            overflow-y: auto;
-            line-height: 1.7;
-            font-size: 16px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            padding: 24px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
-        #result-blocks p {
-            padding: 4px 8px;
-            margin: 0;
-            border-radius: 4px;
-            transition: background-color 0.2s;
+        .novel-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
         }
-        /* (미래) 편집 가능한 블록처럼 보이도록 호버 효과 */
-        #result-blocks p:hover {
-            background-color: #f0f8ff;
+        .novel-card h3 {
+            font-size: 20px;
+            color: #007aff;
+            margin-bottom: 10px;
         }
-        #result-blocks p.empty-line {
-            height: 1em; /* 빈 줄도 높이 차지 */
+        .novel-card p {
+            font-size: 14px;
+            color: #666;
+            flex-grow: 1;
+            line-height: 1.6;
         }
-        
-        /* [추가] 지시 내역 출력 영역 */
-        #result-instructions {
-            background: #2d2d2d;
-            color: #f1f1f1;
-            border-radius: 8px;
-            padding: 16px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
+        .novel-card .date {
             font-size: 12px;
-            max-height: 300px;
-            overflow-y: auto;
+            color: #999;
+            margin-top: 16px;
         }
-
-        .key-group { display: flex; gap: 10px; align-items: center; }
-        .key-group input { flex-grow: 1; }
-        
-        @media (max-width: 900px) {
-            .layout-grid { grid-template-columns: 1fr; }
+        .add-card {
+            border: 2px dashed #007aff;
+            color: #007aff;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .add-card:hover {
+            background-color: #f0f8ff;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎭 AI 웹소설 집필 도구 (V4)</h1>
-        
-        <div class="form-group">
-            <label for="secretKey">경비실 문 열쇠 (MY_SECRET_KEY)</label>
-            <div class="key-group">
-                <input type="password" id="secretKey" placeholder="개인 인증 키">
-                <button id="saveKeyButton" class="secondary">🔑 저장</button>
+    <h1>AI 웹소설 집필 도구 (V5)</h1>
+
+    <div class="novel-grid">
+        <div class="novel-card" onclick="location.href='editor.html?id=novel_1'">
+            <div>
+                <h3>회귀자와 딥러닝</h3>
+                <p>주인공 '김AI'가 딥러닝으로 과거를 바꾸는 이야기.</p>
             </div>
+            <span class="date">최근 수정: 2025. 11. 07.</span>
         </div>
 
-        <hr style="border: 0; height: 1px; background: #e0e0e0; margin: 30px 0;">
-
-        <div class="layout-grid">
-            
-            <div class="settings-panel">
-                <h2>설정 및 요청</h2>
-
-                <div class="form-group">
-                    <label for="novelTitle">소설 제목</label>
-                    <input type="text" id="novelTitle" placeholder="예: 회귀자와 딥러닝">
-                </div>
-
-                <div class="form-group">
-                    <label for="worldviewDb">세계관 DB (JSON 또는 텍스트)</label>
-                    <textarea id="worldviewDb" placeholder="[캐릭터]&#10;이름: A&#10;성격: 냉소적&#10;말투: '...'&#10;&#10;[장소]&#10;이름: B의 숲&#10;설명: ...&#10;&#10;(나중에는 JSON 형식으로 관리하는 것이 좋습니다)"></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label for="sceneRequest">씬 생성 요청</label>
-                    <textarea id="sceneRequest" placeholder="이 설정으로 씬 생성: A가 B의 숲에서 C를 만난다." style="min-height: 100px;"></textarea>
-                </div>
-
-                <button id="generateButton">✨ 씬 생성하기 (3단계)</button>
+        <div class="novel-card" onclick="location.href='editor.html?id=novel_2'">
+            <div>
+                <h3>내 SvelteKit이 이렇게 강할 리 없어</h3>
+                <p>이세계에 떨어진 개발자가 프레임워크 스킬로 살아남는 법.</p>
             </div>
+            <span class="date">최근 수정: 2025. 11. 05.</span>
+        </div>
 
-            <div class="results-panel">
-                <h2>결과 (블록 단위)</h2>
-                
-                <div class="form-group">
-                    <label>최종 본문</label>
-                    <div id="result-blocks">
-                        <p style="color: #999;">여기에 생성된 소설 본문이 블록(줄) 단위로 표시됩니다.</p>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>AI 지시 내역 (중간 산출물)</label>
-                    <pre id="result-instructions">여기에 1, 2단계의 중간 산출물(기획안, 일본어 원문 등)이 표시됩니다.</pre>
-                </div>
-            </div>
-
+        <div class="add-card" id="addNovelButton">
+            <span>+</span>
+            <p style="font-size: 16px; margin-top: 10px;">새 소설 추가</p>
         </div>
     </div>
 
     <script>
-        // /index.html - JavaScript 로직
-        
-        window.addEventListener('DOMContentLoaded', () => {
-            const savedKey = localStorage.getItem('MY_SECRET_KEY');
-            if (savedKey) document.getElementById('secretKey').value = savedKey;
-        });
-
-        document.getElementById('saveKeyButton').addEventListener('click', () => {
-            const secretKey = document.getElementById('secretKey').value.trim();
-            if (!secretKey) return alert('경비실 문 열쇠를 입력해주세요!');
-            localStorage.setItem('MY_SECRET_KEY', secretKey);
-            alert('경비실 문 열쇠가 저장되었습니다! 🔑');
-        });
-
-        document.getElementById('generateButton').addEventListener('click', async () => {
-            const button = document.getElementById('generateButton');
-            const resultBlocksElement = document.getElementById('result-blocks');
-            const resultInstructionsElement = document.getElementById('result-instructions');
-            const secretKey = localStorage.getItem('MY_SECRET_KEY');
-            
-            // 1. 데이터 수집 (유연한 DB 포함)
-            const sceneRequest = document.getElementById('sceneRequest').value.trim();
-            
-            // [수정] 유연한 DB 데이터를 가져옴
-            // (임시방편: 현재는 textarea의 모든 텍스트를 그대로 보냄)
-            const worldviewDbText = document.getElementById('worldviewDb').value.trim();
-            
-            // (참고) 나중에 프레임워크를 쓰게 되면 이 부분은 복잡한 JSON 객체가 됨
-            const worldviewDatabase = {
-                // 임시로 하나의 필드에 모든 텍스트를 넣음
-                world: worldviewDbText,
-                chars: "", 
-                locs: "",
-                plot: ""
-            };
-
-            // 2. 유효성 검사
-            if (!secretKey) return alert('먼저 경비실 문 열쇠를 저장해주세요!');
-            if (!sceneRequest) return alert('씬 생성 요청을 입력해주세요!');
-            if (!worldviewDbText) return alert('세계관 DB를 입력해주세요!');
-
-            // 3. [2025-10-19] 지침: 버튼 비활성화
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = '생성 중... (1/3 기획)';
-            resultBlocksElement.innerHTML = '<p style="color: #999;">생성을 시작합니다...</p>';
-            resultInstructionsElement.textContent = '대기 중...';
-
-            try {
-                // 4. 백엔드 API 호출
-                const response = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-my-secret-key': secretKey
-                    },
-                    body: JSON.stringify({
-                        sceneRequest: sceneRequest,
-                        worldviewDatabase: worldviewDatabase // 수정된 데이터
-                    })
-                });
-
-                if (!response.ok) {
-                    if (response.status === 401) throw new Error('인증 실패: 경비실 문 열쇠가 올바르지 않습니다.');
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || `요청 실패: ${response.status}`);
-                }
-
-                const data = await response.json();
-                
-                // 5. [수정] 결과 렌더링
-                if (data.blocks) {
-                    // 5-1. 블록 단위 렌더링
-                    resultBlocksElement.innerHTML = ''; // 기존 내용 초기화
-                    data.blocks.forEach(line => {
-                        const p = document.createElement('p');
-                        if (line === "") {
-                            p.innerHTML = '&nbsp;'; // 빈 줄 표현
-                            p.className = 'empty-line';
-                        } else {
-                            p.textContent = line;
-                        }
-                        resultBlocksElement.appendChild(p);
-                    });
-                } else {
-                    resultBlocksElement.innerHTML = '<p style="color: red;">오류: 'blocks' 데이터가 없습니다.</p>';
-                }
-
-                // 5-2. [추가] 지시 내역 렌더링
-                if (data.instructions) {
-                    const instructionsText = `--- [1단계] 기획안 (씬 아웃라인) ---\n${data.instructions.step1_Outline}\n\n` +
-                                           `--- [1단계] 번역 지침서 ---\n${JSON.stringify(data.instructions.step1_Guide, null, 2)}\n\n` +
-                                           `--- [2단계] 일본어 원문 ---\n${data.instructions.step2_Japanese}`;
-                    resultInstructionsElement.textContent = instructionsText;
-                }
-
-            } catch (error) {
-                console.error('Error:', error);
-                resultBlocksElement.innerHTML = `<p style="color: red;">오류 발생:\n${error.message}</p>`;
-                alert(`오류: ${error.message}`);
-            } finally {
-                // 6. [2025-10-19] 지침: 버튼 복구
-                button.disabled = false;
-                button.textContent = originalText;
+        document.getElementById('addNovelButton').addEventListener('click', () => {
+            const title = prompt("새 소설의 제목을 입력하세요:", "무제");
+            if (title) {
+                // TODO: Vercel KV DB에 새 소설 객체 생성
+                // const newNovel = await createNovelInDB(title);
+                // location.href = `editor.html?id=${newNovel.id}`;
+                alert(`(미구현) '${title}' 소설 생성 후 editor.html로 이동합니다.`);
             }
         });
     </script>
