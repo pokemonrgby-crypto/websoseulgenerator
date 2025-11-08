@@ -1,0 +1,17 @@
+{
+  "name": "websoseulgenerator",
+  "version": "1.0.0",
+  "description": "개인용 웹소설 생성기 - Vercel 배포용",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "vercel build"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {},
+  "keywords": ["novel", "generator", "ai", "vercel"],
+  "author": "",
+  "license": "ISC"
+}
