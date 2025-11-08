@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>편집기 (V5)</title>
+    <style>
+        /* (V4의 스타일과 유사하지만, 이 페이지에 맞게 재구성) */
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; }
+        .editor-layout {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            height: calc(100vh - 80px);
+        }
+        .sidebar { overflow-y: auto; }
+        .main-content { overflow-y: auto; }
+        h1, h2 { margin-bottom: 15px; }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            min-height: 150px;
+            font-family: 'Courier New', monospace;
+        }
+        /* 블록 에디터 (V4의 아이디어) */
+        #novel-blocks {
+            border: 1px solid #ddd;
+            min-height: 400px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        #novel-blocks p:hover { background-color: #f0f8ff; cursor: pointer; }
+        
+        button {
+            background: #007aff; color: white; border: none;
+            padding: 10px 15px; border-radius: 8px;
+            cursor: pointer; margin-right: 10px;
+        }
+        button:disabled { background: #999; }
+    </style>
+</head>
+<body>
+    <h1 id="novelTitle" style="text-align: center;">... (소설 제목 로딩 중)</h1>
+
+    <div class="editor-layout">
+        <div class="sidebar">
+            <h2>세계관 DB (JSON)</h2>
+            <textarea id="worldviewDb" placeholder="여기에 이 소설만의 캐릭터, 장소, 규칙 등을 자유로운 JSON/텍스트 형식으로 입력합니다..."></textarea>
+            
+            <hr style="margin: 20px 0;">
+            
+            <h2>AI 기능 (Simple Proxy)</h2>
+            <textarea id="promptInput" placeholder="AI에게 시킬 작업을 입력하세요..."></textarea>
+            <button id="geminiProButton">Gemini Pro로 실행</button>
+            <button id="geminiFlashButton">Gemini Flash로 실행</button>
+            <pre id="aiResult" style="background: #eee; padding: 10px;"></pre>
+        </div>
+
+        <div class="main-content">
+            <h2>본문 (블록 단위)</h2>
+            <div id="novel-blocks">
+                <p>A가 사과를 주웠다.</p>
+                <p>&nbsp;</p>
+                <p>"음, 달콤한 향기가 나네?"</p>
+                </div>
+        </div>
+    </div>
+
+    <script>
+        // /editor.html - JavaScript 로직
+        
+        // (1. 소설 ID 파싱 및 데이터 로드)
+        window.addEventListener('DOMContentLoaded', () => {
+            const novelId = new URLSearchParams(window.location.search).get('id');
+            // TODO: DB에서 novelId로 소설 데이터(제목, DB, 블록) 로드
+            document.getElementById('novelTitle').textContent = `(편집 중) ${novelId}`;
+            
+            // TODO: DB에서 가져온 데이터로 textarea와 novel-blocks 채우기
+            // document.getElementById('worldviewDb').value = novel.db;
+            // renderBlocks(novel.blocks);
+        });
+
+        // (2. [V5] 새로운 Simple Proxy 호출)
+        const geminiProBtn = document.getElementById('geminiProButton');
+        const geminiFlashBtn = document.getElementById('geminiFlashButton');
+        const aiResultEl = document.getElementById('aiResult');
+        const promptInput = document.getElementById('promptInput');
+
+        async function callSimpleProxy(modelName) {
+            const secretKey = localStorage.getItem('MY_SECRET_KEY'); // (index.html에서 저장했어야 함)
+            const prompt = promptInput.value;
+
+            if (!secretKey) return alert('인증 키가 없습니다. (index.html에서 저장 필요)');
+            if (!prompt) return alert('프롬프트를 입력하세요.');
+
+            // [2025-10-19] 지침: 버튼 비활성화
+            geminiProBtn.disabled = true;
+            geminiFlashBtn.disabled = true;
+            aiResultEl.textContent = `${modelName} 모델 생각 중...`;
+
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-my-secret-key': secretKey
+                    },
+                    body: JSON.stringify({
+                        model: modelName, // [V5] "gemini-pro" 또는 "gemini-flash"
+                        prompt: prompt      // [V5] 프론트엔드가 만든 프롬프트
+                    })
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) throw new Error('401 인증 실패');
+                    const err = await response.json();
+                    throw new Error(err.error || 'API 호출 실패');
+                }
+
+                const data = await response.json();
+                aiResultEl.textContent = data.text; // (api/generate.js가 text를 반환한다고 가정)
+
+            } catch (error) {
+                aiResultEl.textContent = `오류: ${error.message}`;
+            } finally {
+                // [2025-10-19] 지침: 버튼 활성화
+                geminiProBtn.disabled = false;
+                geminiFlashBtn.disabled = false;
+            }
+        }
+
+        geminiProBtn.addEventListener('click', () => callSimpleProxy('gemini-2.5-pro'));
+        geminiFlashBtn.addEventListener('click', () => callSimpleProxy('gemini-2.5-flash'));
+
+    </script>
+</body>
+</html>
