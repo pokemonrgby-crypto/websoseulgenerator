@@ -2,35 +2,38 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 웹소설 생성기 (V3)</title>
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <title>AI 웹소설 집필 도구 (V4)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #3a1c71 0%, #d76d77 50%, #ffaf7b 100%);
-            min-height: 100vh;
+            background: #f0f2f5;
             padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
         }
         .container {
-            background: rgba(255, 255, 255, 0.95);
+            background: #ffffff;
             border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
             padding: 30px;
-            max-width: 900px;
+            max-width: 1200px;
             width: 100%;
-            margin-top: 30px;
+            margin: 30px auto;
         }
-        h1 {
+        h1, h2 {
             color: #333;
             margin-bottom: 20px;
             text-align: center;
-            font-size: 28px;
-            font-weight: 700;
         }
+        h1 { font-size: 28px; }
+        h2 { font-size: 22px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
         .form-group { margin-bottom: 20px; }
         label {
             display: block;
@@ -39,7 +42,7 @@
             font-weight: 600;
             font-size: 14px;
         }
-        input[type="password"], textarea {
+        input[type="text"], input[type="password"], textarea {
             width: 100%;
             padding: 12px;
             border: 2px solid #e0e0e0;
@@ -48,23 +51,19 @@
             transition: border-color 0.3s;
             font-family: inherit;
         }
-        input[type="password"]:focus, textarea:focus {
+        input:focus, textarea:focus {
             outline: none;
-            border-color: #d76d77;
+            border-color: #007aff;
         }
         textarea {
-            min-height: 100px;
+            min-height: 200px;
             resize: vertical;
             background: #fafafa;
+            font-family: 'Courier New', Courier, monospace;
         }
-        .db-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-        .scene-request { min-height: 120px; }
+        
         button {
-            background: linear-gradient(135deg, #d76d77 0%, #ffaf7b 100%);
+            background: #007aff;
             color: white;
             border: none;
             padding: 14px 28px;
@@ -76,8 +75,9 @@
             width: 100%;
         }
         button:hover:not(:disabled) {
+            background: #005bb5;
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(215, 109, 119, 0.4);
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2);
         }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
         button.secondary {
@@ -86,33 +86,57 @@
             padding: 10px 15px;
             font-size: 14px;
         }
-        pre {
-            background: #f0f0f0;
+
+        /* [수정] 블록 단위 출력 영역 */
+        #result-blocks {
+            background: #fff;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
+            padding: 10px;
+            min-height: 200px;
+            max-height: 600px;
+            overflow-y: auto;
+            line-height: 1.7;
+            font-size: 16px;
+        }
+        #result-blocks p {
+            padding: 4px 8px;
+            margin: 0;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        /* (미래) 편집 가능한 블록처럼 보이도록 호버 효과 */
+        #result-blocks p:hover {
+            background-color: #f0f8ff;
+        }
+        #result-blocks p.empty-line {
+            height: 1em; /* 빈 줄도 높이 차지 */
+        }
+        
+        /* [추가] 지시 내역 출력 영역 */
+        #result-instructions {
+            background: #2d2d2d;
+            color: #f1f1f1;
+            border-radius: 8px;
             padding: 16px;
-            overflow-x: auto;
             white-space: pre-wrap;
             word-wrap: break-word;
-            font-size: 14px;
-            line-height: 1.6;
-            max-height: 500px;
+            font-size: 12px;
+            max-height: 300px;
             overflow-y: auto;
-            margin-top: 10px;
         }
+
         .key-group { display: flex; gap: 10px; align-items: center; }
         .key-group input { flex-grow: 1; }
         
-        @media (max-width: 768px) {
-            .db-grid { grid-template-columns: 1fr; }
-            .container { padding: 20px; }
-            h1 { font-size: 24px; }
+        @media (max-width: 900px) {
+            .layout-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎭 AI 웹소설 생성기 (V3)</h1>
+        <h1>🎭 AI 웹소설 집필 도구 (V4)</h1>
         
         <div class="form-group">
             <label for="secretKey">경비실 문 열쇠 (MY_SECRET_KEY)</label>
@@ -124,43 +148,45 @@
 
         <hr style="border: 0; height: 1px; background: #e0e0e0; margin: 30px 0;">
 
-        <h2>📚 세계관 데이터베이스</h2>
-        
-        <div class="form-group">
-            <label for="worldviewDb">세계관 (Worldview)</label>
-            <textarea id="worldviewDb" placeholder="시대 배경, 마법/기술 규칙, 고유 용어 등"></textarea>
-        </div>
+        <div class="layout-grid">
+            
+            <div class="settings-panel">
+                <h2>설정 및 요청</h2>
 
-        <div class="db-grid">
-            <div class="form-group">
-                <label for="charactersDb">캐릭터 (Characters)</label>
-                <textarea id="charactersDb" placeholder="[주인공A]&#10;성격: 냉소적&#10;말투: 짧게 끊어 말함. '..., ...그런가.'&#10;외형: 흑발, 흑안"></textarea>
+                <div class="form-group">
+                    <label for="novelTitle">소설 제목</label>
+                    <input type="text" id="novelTitle" placeholder="예: 회귀자와 딥러닝">
+                </div>
+
+                <div class="form-group">
+                    <label for="worldviewDb">세계관 DB (JSON 또는 텍스트)</label>
+                    <textarea id="worldviewDb" placeholder="[캐릭터]&#10;이름: A&#10;성격: 냉소적&#10;말투: '...'&#10;&#10;[장소]&#10;이름: B의 숲&#10;설명: ...&#10;&#10;(나중에는 JSON 형식으로 관리하는 것이 좋습니다)"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="sceneRequest">씬 생성 요청</label>
+                    <textarea id="sceneRequest" placeholder="이 설정으로 씬 생성: A가 B의 숲에서 C를 만난다." style="min-height: 100px;"></textarea>
+                </div>
+
+                <button id="generateButton">✨ 씬 생성하기 (3단계)</button>
             </div>
-            <div class="form-group">
-                <label for="locationsDb">장소 (Locations)</label>
-                <textarea id="locationsDb" placeholder="[A 장소]&#10;설명: 마력이 넘치는 숲&#10;사건: 주인공이 처음 각성한 곳"></textarea>
+
+            <div class="results-panel">
+                <h2>결과 (블록 단위)</h2>
+                
+                <div class="form-group">
+                    <label>최종 본문</label>
+                    <div id="result-blocks">
+                        <p style="color: #999;">여기에 생성된 소설 본문이 블록(줄) 단위로 표시됩니다.</p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>AI 지시 내역 (중간 산출물)</label>
+                    <pre id="result-instructions">여기에 1, 2단계의 중간 산출물(기획안, 일본어 원문 등)이 표시됩니다.</pre>
+                </div>
             </div>
-        </div>
 
-        <div class="form-group">
-            <label for="plotDb">관계도 및 사건 (Plot Points)</label>
-            <textarea id="plotDb" placeholder="[관계]&#10;A -> B (불신)&#10;[사건]&#10;1. A가 B를 만남&#10;2. ..."></textarea>
-        </div>
-
-        <hr style="border: 0; height: 1px; background: #e0e0e0; margin: 30px 0;">
-
-        <h2>🎬 씬 생성 요청</h2>
-
-        <div class="form-group">
-            <label for="sceneRequest">이번에 생성할 씬 (Scene Request)</label>
-            <textarea id="sceneRequest" class="scene-request" placeholder="이 설정으로 씬 생성: &#10;[A 장소]에서 [주인공A]가 [B]와 대화한다. A는 B를 떠보려고 한다."></textarea>
-        </div>
-
-        <button id="generateButton">✨ 씬 생성하기 (3단계)</button>
-
-        <div class="result-container" style="margin-top: 20px;">
-            <label>결과</label>
-            <pre id="result">여기에 최종 한국어 본문이 표시됩니다.</pre>
         </div>
     </div>
 
@@ -169,53 +195,52 @@
         
         window.addEventListener('DOMContentLoaded', () => {
             const savedKey = localStorage.getItem('MY_SECRET_KEY');
-            if (savedKey) {
-                document.getElementById('secretKey').value = savedKey;
-            }
+            if (savedKey) document.getElementById('secretKey').value = savedKey;
         });
 
         document.getElementById('saveKeyButton').addEventListener('click', () => {
             const secretKey = document.getElementById('secretKey').value.trim();
-            if (!secretKey) {
-                alert('경비실 문 열쇠를 입력해주세요!');
-                return;
-            }
+            if (!secretKey) return alert('경비실 문 열쇠를 입력해주세요!');
             localStorage.setItem('MY_SECRET_KEY', secretKey);
             alert('경비실 문 열쇠가 저장되었습니다! 🔑');
         });
 
         document.getElementById('generateButton').addEventListener('click', async () => {
             const button = document.getElementById('generateButton');
-            const resultElement = document.getElementById('result');
+            const resultBlocksElement = document.getElementById('result-blocks');
+            const resultInstructionsElement = document.getElementById('result-instructions');
             const secretKey = localStorage.getItem('MY_SECRET_KEY');
             
-            // 1. 데이터 수집
+            // 1. 데이터 수집 (유연한 DB 포함)
             const sceneRequest = document.getElementById('sceneRequest').value.trim();
+            
+            // [수정] 유연한 DB 데이터를 가져옴
+            // (임시방편: 현재는 textarea의 모든 텍스트를 그대로 보냄)
+            const worldviewDbText = document.getElementById('worldviewDb').value.trim();
+            
+            // (참고) 나중에 프레임워크를 쓰게 되면 이 부분은 복잡한 JSON 객체가 됨
             const worldviewDatabase = {
-                world: document.getElementById('worldviewDb').value.trim(),
-                chars: document.getElementById('charactersDb').value.trim(),
-                locs: document.getElementById('locationsDb').value.trim(),
-                plot: document.getElementById('plotDb').value.trim()
+                // 임시로 하나의 필드에 모든 텍스트를 넣음
+                world: worldviewDbText,
+                chars: "", 
+                locs: "",
+                plot: ""
             };
 
             // 2. 유효성 검사
-            if (!secretKey) {
-                alert('먼저 경비실 문 열쇠를 저장해주세요!');
-                return;
-            }
-            if (!sceneRequest) {
-                alert('씬 생성 요청을 입력해주세요!');
-                return;
-            }
+            if (!secretKey) return alert('먼저 경비실 문 열쇠를 저장해주세요!');
+            if (!sceneRequest) return alert('씬 생성 요청을 입력해주세요!');
+            if (!worldviewDbText) return alert('세계관 DB를 입력해주세요!');
 
-            // 3. [2025-10-19] 지침: 버튼 비활성화 및 텍스트 변경
+            // 3. [2025-10-19] 지침: 버튼 비활성화
             const originalText = button.textContent;
             button.disabled = true;
-            button.textContent = '생성 중... (1/3 기획 중)';
-            resultElement.textContent = '생성을 시작합니다... (1/3 기획)';
+            button.textContent = '생성 중... (1/3 기획)';
+            resultBlocksElement.innerHTML = '<p style="color: #999;">생성을 시작합니다...</p>';
+            resultInstructionsElement.textContent = '대기 중...';
 
             try {
-                // 4. 백엔드 API 호출 (3단계 파이프라인)
+                // 4. 백엔드 API 호출
                 const response = await fetch('/api/generate', {
                     method: 'POST',
                     headers: {
@@ -224,35 +249,47 @@
                     },
                     body: JSON.stringify({
                         sceneRequest: sceneRequest,
-                        worldviewDatabase: worldviewDatabase
+                        worldviewDatabase: worldviewDatabase // 수정된 데이터
                     })
                 });
 
-                // 중간 상태 업데이트 콜백 (실제 구현 시 WebSocket이나 SSE 사용 권장)
-                // 여기서는 fetch가 완료될 때까지 기다림
-                // button.textContent = '생성 중... (2/3 집필 중)';
-                // button.textContent = '생성 중... (3/3 번역 중)';
-
                 if (!response.ok) {
-                    if (response.status === 401) {
-                        throw new Error('인증 실패: 경비실 문 열쇠가 올바르지 않습니다.');
-                    }
+                    if (response.status === 401) throw new Error('인증 실패: 경비실 문 열쇠가 올바르지 않습니다.');
                     const errorData = await response.json().catch(() => ({}));
                     throw new Error(errorData.error || `요청 실패: ${response.status}`);
                 }
 
                 const data = await response.json();
                 
-                // 5. 결과 표시
-                if (data.text) {
-                    resultElement.textContent = data.text;
+                // 5. [수정] 결과 렌더링
+                if (data.blocks) {
+                    // 5-1. 블록 단위 렌더링
+                    resultBlocksElement.innerHTML = ''; // 기존 내용 초기화
+                    data.blocks.forEach(line => {
+                        const p = document.createElement('p');
+                        if (line === "") {
+                            p.innerHTML = '&nbsp;'; // 빈 줄 표현
+                            p.className = 'empty-line';
+                        } else {
+                            p.textContent = line;
+                        }
+                        resultBlocksElement.appendChild(p);
+                    });
                 } else {
-                    resultElement.textContent = JSON.stringify(data, null, 2);
+                    resultBlocksElement.innerHTML = '<p style="color: red;">오류: 'blocks' 데이터가 없습니다.</p>';
+                }
+
+                // 5-2. [추가] 지시 내역 렌더링
+                if (data.instructions) {
+                    const instructionsText = `--- [1단계] 기획안 (씬 아웃라인) ---\n${data.instructions.step1_Outline}\n\n` +
+                                           `--- [1단계] 번역 지침서 ---\n${JSON.stringify(data.instructions.step1_Guide, null, 2)}\n\n` +
+                                           `--- [2단계] 일본어 원문 ---\n${data.instructions.step2_Japanese}`;
+                    resultInstructionsElement.textContent = instructionsText;
                 }
 
             } catch (error) {
                 console.error('Error:', error);
-                resultElement.textContent = `오류 발생:\n${error.message}`;
+                resultBlocksElement.innerHTML = `<p style="color: red;">오류 발생:\n${error.message}</p>`;
                 alert(`오류: ${error.message}`);
             } finally {
                 // 6. [2025-10-19] 지침: 버튼 복구
