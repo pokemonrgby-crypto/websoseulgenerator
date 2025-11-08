@@ -1,3 +1,4 @@
+<!-- /index.html -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -57,6 +58,23 @@
   const $=sel=>document.querySelector(sel);
   function loadNovels(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } }
   function saveNovels(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
+  
+  // 토스트 알림 함수
+  function showToast(message, type = 'info', duration = 3000) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px;';
+      document.body.appendChild(container);
+    }
+    const colors = { success: '#28a745', error: '#dc3545', info: '#007aff', warning: '#ffc107' };
+    const toast = document.createElement('div');
+    toast.style.cssText = `background:${colors[type]||colors.info};color:white;padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:14px;max-width:350px;`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => { container.removeChild(toast); if(container.children.length===0) document.body.removeChild(container); }, duration);
+  }
   function render(){
     const listEl=$('#list'); listEl.innerHTML='';
     const arr=loadNovels();
@@ -75,20 +93,25 @@
       div.querySelector('.del').onclick=()=>{
         if(!confirm('정말 삭제할래?')) return;
         const next=loadNovels().filter(x=>x.id!==n.id);
-        saveNovels(next); render();
+        saveNovels(next); 
+        showToast('소설이 삭제되었습니다.', 'success');
+        render();
       };
       listEl.appendChild(div);
     });
   }
   document.getElementById('addNovelButton').addEventListener('click', ()=>{
+    // TODO: 향후 모달로 개선 - 제목 입력, 리소스 생성 UI 제공
+    // 현재는 간단하게 prompt 사용
     const title=prompt('새 소설의 제목을 입력해줘:','무제');
     if(!title) return;
     const now=Date.now(), id='nov_'+now;
-    const novel={ id, title, createdAt:now, updatedAt:now, meta:{}, episodes:[] };
+    const novel={ id, title, createdAt:now, updatedAt:now, meta:{}, episodes:[], resources:[] };
     // 첫 회차 생성
-    novel.episodes.push({ no:1, title:'1화', content:'', updatedAt:now });
+    novel.episodes.push({ no:1, title:'1화', content:'', updatedAt:now, resources:[] });
     const arr=loadNovels(); arr.unshift(novel); saveNovels(arr);
-    location.href=`editor.html?id=${id}&ep=1`;
+    showToast('새 소설이 생성되었습니다!', 'success');
+    location.href=`novel.html?id=${id}&ep=1`;
   });
   render();
 </script>

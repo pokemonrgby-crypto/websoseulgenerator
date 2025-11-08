@@ -38,11 +38,23 @@
       * `GEMINI_API_KEY`, `NOVELAI_API_KEY` 등 모든 외부 API 키는 **절대** 프론트엔드 코드에 포함시키지 않습니다.
       * 모든 키는 \*\*Vercel 대시보드의 "Environment Variables"\*\*에만 저장하며, 서버리스 함수 내에서 `process.env`를 통해서만 접근합니다.
   * **AI 모델 처리:**
-      * AI 모델은 \*\*"gemini-2.5-flash-lite"\*\*로 고정합니다. (단, API 응답 오류 시 `gemini-1.5-flash` 등으로 대체할 수 있는 예외 처리 로직을 `TODO`로 남겨둡니다.)
+      * **NovelAI**: 항상 **최신/최상 모델** 사용 (환경변수 `NOVELAI_MODEL`로 관리, 기본값: `kayra-v1`)
+      * **모델별 역할**:
+        - SKETCH (스케치/간단 질의): `gemini-2.5-flash-lite`
+        - J_DRAFT/J_POLISH (본문 초안/다듬기): `NovelAI 최신 모델` - **일본어**
+        - TRANSLATE_KO (번역): `gemini-2.5-pro` - 일본어 → 한국어
+      * **재시도 로직**: 429/5xx 오류 시 지수 백오프 (1s → 2s → 4s, 최대 3회)
       * AI가 생성할 필요 없는 고정 필드(예: `id`, `createdAt`, `authorId`)는 **반드시 서버리스 함수 내에서** 처리하여 JSON에 추가합니다.
-      * 모든 AI 생성 요청에 \*\*안전 필터(Safety Settings)\*\*를 적용합니다.
+      * 모든 AI 생성 요청에 **안전 필터(Safety Settings)** 적용합니다.
   * **데이터베이스 (Firestore 연동 시):**
       * **만약 Vercel 함수에서 Firestore DB를 연동해 사용한다면**, Firestore 트랜잭션 규칙(**"all reads before all writes"**)을 **동일하게 준수**해야 합니다. (이는 Firestore 고유의 규칙이므로 플랫폼과 무관하게 적용됩니다.)
+  * **환경 변수:**
+      * Vercel 대시보드의 "Environment Variables"에 다음 변수들을 설정해야 합니다:
+        - `MY_SECRET_KEY`: 개인용 인증 키
+        - `GEMINI_API_KEY`: Google Gemini API 키
+        - `NOVELAI_API_KEY`: NovelAI API 키
+        - `NOVELAI_MODEL`: NovelAI 모델명 (기본값: `kayra-v1`, 최신 모델로 주기적 업데이트)
+        - `NOVELAI_MAX_LENGTH`: NovelAI 최대 생성 길이 (기본값: `4000`, 3000-4000자 목표)
 
 -----
 

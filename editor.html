@@ -1,3 +1,4 @@
+<!-- /editor.html -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -60,18 +61,18 @@
             <h2>AI 기능</h2>
 
             <fieldset style="border: 2px solid #28a745; border-radius: 8px; padding: 10px;">
-                <legend>핵심 기능 (프롬프트 작성)</legend>
-                <textarea id="sceneRequest" placeholder="[핵심 프롬프트]&#10;여기에 3단계 파이프라인 프롬프트를 직접 입력하거나,&#10;AI가 생성할 씬을 요청하세요.&#10;모델은 (예: Gemini Pro)로 전송됩니다."></textarea>
-                <button id="generateSceneButton" class="main-ai">✨ 핵심 프롬프트 전송 (예: Pro)</button>
+                <legend>핵심 기능 (본문 생성)</legend>
+                <textarea id="sceneRequest" placeholder="[핵심 프롬프트]&#10;여기에 장면 요청/이어쓰기 내용을 입력하세요.&#10;NovelAI 최신 모델로 일본어 본문이 생성됩니다."></textarea>
+                <button id="generateSceneButton" class="main-ai">✨ 본문 생성 (NovelAI/일본어)</button>
                 <pre id="sceneResult" style="background: #f0f0f0; padding: 5px;"></pre>
             </fieldset>
 
             <hr style="margin: 20px 0;">
 
             <fieldset style="border: 1px solid #6c757d; border-radius: 8px; padding: 10px;">
-                <legend>편의 기능 (프롬프트 작성)</legend>
-                <textarea id="proxyPrompt" placeholder="[편의 프롬프트]&#10;일관성 확인 등 간단한 질문&#10;예: A의 말투는?&#10;모델은 (예: Gemini Flash)로 전송됩니다."></textarea>
-                <button id="proxyButton" class="sub-ai">편의 프롬프트 전송 (예: Flash)</button>
+                <legend>편의 기능 (빠른 질문)</legend>
+                <textarea id="proxyPrompt" placeholder="[편의 프롬프트]&#10;일관성 확인 등 간단한 질문&#10;예: A의 말투는?&#10;모델: Gemini Flash-lite"></textarea>
+                <button id="proxyButton" class="sub-ai">편의 프롬프트 전송 (Flash-lite)</button>
                 <pre id="proxyResult" style="background: #f0f0f0; padding: 5px;"></pre>
             </fieldset>
             
@@ -95,51 +96,51 @@
 
         const secretKey = localStorage.getItem('MY_SECRET_KEY'); // (인증 키)
 
-        // --- [핵심 기능] Simple Proxy 호출 (Pro 모델 예시) ---
+        // --- [핵심 기능] NovelAI로 일본어 본문 생성 ---
         const generateBtn = document.getElementById('generateSceneButton');
         const sceneResultEl = document.getElementById('sceneResult');
         
         generateBtn.addEventListener('click', async () => {
             const prompt = document.getElementById('sceneRequest').value;
-            // (이 회차의 DB(dbAfter)와 마스터 DB를 조합하여 프롬프트에 포함시킬 수 있음)
+            // TODO: 이 회차의 DB(dbAfter)와 마스터 DB를 조합하여 프롬프트에 포함
             // const worldviewDatabase = document.getElementById('dbAfter').value;
             // const fullPrompt = worldviewDatabase + "\n\n" + prompt;
             
             if (!secretKey || !prompt) return alert("키 또는 씬 요청이 없습니다.");
 
-            // [2025-10-19] 버튼 비활성화
+            // 버튼 비활성화
             generateBtn.disabled = true;
             generateBtn.textContent = "생성 중...";
             
             try {
-                // [수정] V5의 Simple Proxy API('/api/generate')를 호출
+                // NovelAI로 일본어 본문 생성
                 const res = await fetch('/api/generate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'x-my-secret-key': secretKey},
                     body: JSON.stringify({ 
-                        model: 'gemini-2.5-pro', // 프론트엔드가 모델 결정
-                        prompt: prompt           // 프론트엔드가 프롬프트 결정
+                        model: 'novelai',  // NovelAI 최신 모델 사용
+                        prompt: prompt     // 일본어 생성 프롬프트
                     })
                 });
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json();
                 
-                // (블록 에디터에 결과 추가)
+                // 블록 에디터에 결과 추가
                 const p = document.createElement('p');
                 p.textContent = data.text || ' ';
                 document.getElementById('novel-blocks').appendChild(p);
                 
-                sceneResultEl.textContent = `[${data.model}] 응답 완료.`;
+                sceneResultEl.textContent = `[${data.model}] 일본어 본문 생성 완료.`;
 
             } catch (e) {
                 sceneResultEl.textContent = `오류: ${e.message}`;
             } finally {
                 generateBtn.disabled = false;
-                generateBtn.textContent = "✨ 핵심 프롬프트 전송 (예: Pro)";
+                generateBtn.textContent = "✨ 본문 생성 (NovelAI/일본어)";
             }
         });
 
-        // --- [편의 기능] Simple Proxy 호출 (Flash 모델 예시) ---
+        // --- [편의 기능] Flash-lite로 빠른 질문 ---
         const proxyBtn = document.getElementById('proxyButton');
         const proxyResultEl = document.getElementById('proxyResult');
         
@@ -148,15 +149,16 @@
             if (!secretKey || !prompt) return alert("키 또는 프롬프트가 없습니다.");
 
             proxyBtn.disabled = true;
+            proxyBtn.textContent = "전송 중...";
 
             try {
-                // [수정] V5의 Simple Proxy API('/api/generate')를 호출
+                // Flash-lite 사용
                 const res = await fetch('/api/generate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'x-my-secret-key': secretKey},
                     body: JSON.stringify({ 
-                        model: 'gemini-2.5-flash', // 프론트엔드가 모델 결정
-                        prompt: prompt             // 프론트엔드가 프롬프트 결정
+                        model: 'gemini-2.5-flash-lite',  // 빠른 질문용
+                        prompt: prompt
                     })
                 });
                 if (!res.ok) throw new Error(await res.text());
@@ -166,6 +168,7 @@
                 proxyResultEl.textContent = `오류: ${e.message}`;
             } finally {
                 proxyBtn.disabled = false;
+                proxyBtn.textContent = "편의 프롬프트 전송 (Flash-lite)";
             }
         });
 
