@@ -1,108 +1,96 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>내 소설 목록 (V5)</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f0f2f5;
-            padding: 30px;
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 30px;
-        }
-        .novel-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 24px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .novel-card, .add-card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            padding: 24px;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            min-height: 180px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-        .novel-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
-        }
-        .novel-card h3 {
-            font-size: 20px;
-            color: #007aff;
-            margin-bottom: 10px;
-        }
-        .novel-card p {
-            font-size: 14px;
-            color: #666;
-            flex-grow: 1;
-            line-height: 1.6;
-        }
-        .novel-card .date {
-            font-size: 12px;
-            color: #999;
-            margin-top: 16px;
-        }
-        .add-card {
-            border: 2px dashed #007aff;
-            color: #007aff;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .add-card:hover {
-            background-color: #f0f8ff;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>내 소설 목록 (V5+)</title>
+  <style>
+    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; padding:30px; }
+    h1 { text-align:center; color:#333; }
+    .topbar { display:flex; justify-content:center; margin:12px 0 24px; gap:8px; }
+    .grid { max-width:1000px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; }
+    .card { background:#fff; border-radius:12px; padding:16px; border:1px solid #e7e7e7; display:flex; flex-direction:column; gap:8px; }
+    .card h3 { margin:0; font-size:16px; color:#222; }
+    .meta { color:#666; font-size:12px; }
+    .row { display:flex; gap:8px; }
+    button { background:#007aff; color:#fff; border:0; padding:8px 12px; border-radius:8px; cursor:pointer; }
+    button.secondary { background:#fff; color:#333; border:1px solid #ddd; }
+    input, textarea { border:1px solid #ddd; border-radius:8px; padding:8px; width:100%; }
+    /* sticky keybar 배경 보정 */
+    .wrap { max-width:1000px; margin:0 auto; }
+  </style>
 </head>
 <body>
-    <h1>AI 웹소설 집필 도구 (V5)</h1>
 
-    <div class="novel-grid">
-        <div class="novel-card" onclick="location.href='editor.html?id=novel_1'">
-            <div>
-                <h3>회귀자와 딥러닝</h3>
-                <p>주인공 '김AI'가 딥러닝으로 과거를 바꾸는 이야기.</p>
-            </div>
-            <span class="date">최근 수정: 2025. 11. 07.</span>
-        </div>
+<!-- [KEYBAR START] -->
+<div id="keybar" style="position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #eee;padding:10px 12px;margin:-30px -30px 20px -30px;display:flex;gap:8px;align-items:center;">
+  <strong>🔑 경비실 키</strong>
+  <input id="secretKeyInput" placeholder="MY_SECRET_KEY" style="flex:1;max-width:360px;padding:8px;border:1px solid #ddd;border-radius:8px;">
+  <button id="saveSecretKeyButton" style="padding:8px 12px;border:0;border-radius:8px;background:#007aff;color:#fff;">저장</button>
+  <button id="deleteSecretKeyButton" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;">삭제</button>
+  <span id="keyStatus" style="margin-left:8px;color:#666;font-size:12px;"></span>
+</div>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const input=$('secretKeyInput'), status=$('keyStatus');
+  const v=localStorage.getItem('MY_SECRET_KEY')||'';
+  input.value=v; status.textContent=v?'저장됨':'미저장';
+  $('saveSecretKeyButton').onclick=()=>{ const t=input.value.trim(); if(!t) return alert('값이 비어있어.'); localStorage.setItem('MY_SECRET_KEY',t); status.textContent='저장됨'; alert('키 저장 완료!'); };
+  $('deleteSecretKeyButton').onclick=()=>{ localStorage.removeItem('MY_SECRET_KEY'); input.value=''; status.textContent='미저장'; alert('키 삭제 완료!'); };
+})();
+</script>
+<!-- [KEYBAR END] -->
 
-        <div class="novel-card" onclick="location.href='editor.html?id=novel_2'">
-            <div>
-                <h3>내 SvelteKit이 이렇게 강할 리 없어</h3>
-                <p>이세계에 떨어진 개발자가 프레임워크 스킬로 살아남는 법.</p>
-            </div>
-            <span class="date">최근 수정: 2025. 11. 05.</span>
-        </div>
+<div class="wrap">
+  <h1>내 소설</h1>
 
-        <div class="add-card" id="addNovelButton">
-            <span>+</span>
-            <p style="font-size: 16px; margin-top: 10px;">새 소설 추가</p>
-        </div>
-    </div>
+  <div class="topbar">
+    <button id="addNovelButton">➕ 새 소설 만들기</button>
+  </div>
 
-    <script>
-        document.getElementById('addNovelButton').addEventListener('click', () => {
-            const title = prompt("새 소설의 제목을 입력하세요:", "무제");
-            if (title) {
-                // TODO: Vercel KV DB에 새 소설 객체 생성
-                // const newNovel = await createNovelInDB(title);
-                // location.href = `editor.html?id=${newNovel.id}`;
-                alert(`(미구현) '${title}' 소설 생성 후 editor.html로 이동합니다.`);
-            }
-        });
-    </script>
+  <div id="list" class="grid"></div>
+</div>
+
+<script>
+  const LS_KEY='novels';
+  const $=sel=>document.querySelector(sel);
+  function loadNovels(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } }
+  function saveNovels(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
+  function render(){
+    const listEl=$('#list'); listEl.innerHTML='';
+    const arr=loadNovels();
+    if(!arr.length){ listEl.innerHTML='<div class="card"><h3>아직 작품이 없어</h3><div class="meta">상단에서 “새 소설 만들기”를 눌러 시작하자.</div></div>'; return; }
+    arr.forEach(n=>{
+      const div=document.createElement('div'); div.className='card';
+      div.innerHTML = `
+        <h3>${n.title}</h3>
+        <div class="meta">ID: ${n.id}</div>
+        <div class="meta">회차: ${n.episodes?.length||0} · 업데이트: ${new Date(n.updatedAt||n.createdAt).toLocaleString()}</div>
+        <div class="row">
+          <button class="open">열기</button>
+          <button class="secondary del">삭제</button>
+        </div>`;
+      div.querySelector('.open').onclick=()=>location.href=`novel.html?id=${n.id}`;
+      div.querySelector('.del').onclick=()=>{
+        if(!confirm('정말 삭제할래?')) return;
+        const next=loadNovels().filter(x=>x.id!==n.id);
+        saveNovels(next); render();
+      };
+      listEl.appendChild(div);
+    });
+  }
+  document.getElementById('addNovelButton').addEventListener('click', ()=>{
+    const title=prompt('새 소설의 제목을 입력해줘:','무제');
+    if(!title) return;
+    const now=Date.now(), id='nov_'+now;
+    const novel={ id, title, createdAt:now, updatedAt:now, meta:{}, episodes:[] };
+    // 첫 회차 생성
+    novel.episodes.push({ no:1, title:'1화', content:'', updatedAt:now });
+    const arr=loadNovels(); arr.unshift(novel); saveNovels(arr);
+    location.href=`editor.html?id=${id}&ep=1`;
+  });
+  render();
+</script>
 </body>
 </html>
