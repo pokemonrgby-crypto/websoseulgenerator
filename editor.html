@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>편집기 (V5)</title>
+    <title>편집기 (V5.1)</title>
     <style>
-        /* (V4의 스타일과 유사하지만, 이 페이지에 맞게 재구성) */
+        /* (스타일은 V5와 동일) */
         body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; }
         .editor-layout {
             display: grid;
@@ -30,7 +30,6 @@
             min-height: 150px;
             font-family: 'Courier New', monospace;
         }
-        /* 블록 에디터 (V4의 아이디어) */
         #novel-blocks {
             border: 1px solid #ddd;
             min-height: 400px;
@@ -42,9 +41,16 @@
         button {
             background: #007aff; color: white; border: none;
             padding: 10px 15px; border-radius: 8px;
-            cursor: pointer; margin-right: 10px;
+            cursor: pointer; margin-right: 10px; margin-top: 5px; /* 여백 추가 */
         }
         button:disabled { background: #999; }
+        /* [추가] NovelAI 버튼을 위한 별도 스타일 */
+        button.novelai {
+            background: #8b5cf6; /* 보라색 계열 */
+        }
+        button.novelai:hover:not(:disabled) {
+            background: #7c3aed;
+        }
     </style>
 </head>
 <body>
@@ -59,9 +65,14 @@
             
             <h2>AI 기능 (Simple Proxy)</h2>
             <textarea id="promptInput" placeholder="AI에게 시킬 작업을 입력하세요..."></textarea>
-            <button id="geminiProButton">Gemini Pro로 실행</button>
-            <button id="geminiFlashButton">Gemini Flash로 실행</button>
-            <pre id="aiResult" style="background: #eee; padding: 10px;"></pre>
+            
+            <div>
+                <button id="geminiProButton">Gemini Pro로 실행</button>
+                <button id="geminiFlashButton">Gemini Flash로 실행</button>
+                <button id="novelaiButton" class="novelai">NovelAI (Kayra)로 실행</button>
+            </div>
+
+            <pre id="aiResult" style="background: #eee; padding: 10px; margin-top: 15px;"></pre>
         </div>
 
         <div class="main-content">
@@ -77,33 +88,35 @@
     <script>
         // /editor.html - JavaScript 로직
         
-        // (1. 소설 ID 파싱 및 데이터 로드)
+        // (1. 소설 ID 파싱 및 데이터 로드 - V5와 동일)
         window.addEventListener('DOMContentLoaded', () => {
             const novelId = new URLSearchParams(window.location.search).get('id');
             // TODO: DB에서 novelId로 소설 데이터(제목, DB, 블록) 로드
             document.getElementById('novelTitle').textContent = `(편집 중) ${novelId}`;
-            
-            // TODO: DB에서 가져온 데이터로 textarea와 novel-blocks 채우기
-            // document.getElementById('worldviewDb').value = novel.db;
-            // renderBlocks(novel.blocks);
+            // ...
         });
 
-        // (2. [V5] 새로운 Simple Proxy 호출)
+        // (2. [V5.1] Simple Proxy 호출 로직 수정)
+        
+        // [수정] 버튼 ID 가져오기
         const geminiProBtn = document.getElementById('geminiProButton');
         const geminiFlashBtn = document.getElementById('geminiFlashButton');
+        const novelaiBtn = document.getElementById('novelaiButton'); // [추가]
+        
         const aiResultEl = document.getElementById('aiResult');
         const promptInput = document.getElementById('promptInput');
 
         async function callSimpleProxy(modelName) {
-            const secretKey = localStorage.getItem('MY_SECRET_KEY'); // (index.html에서 저장했어야 함)
+            const secretKey = localStorage.getItem('MY_SECRET_KEY');
             const prompt = promptInput.value;
 
             if (!secretKey) return alert('인증 키가 없습니다. (index.html에서 저장 필요)');
             if (!prompt) return alert('프롬프트를 입력하세요.');
 
-            // [2025-10-19] 지침: 버튼 비활성화
+            // [2025-10-19] 지침: 버튼 비활성화 (NovelAI 버튼 포함)
             geminiProBtn.disabled = true;
             geminiFlashBtn.disabled = true;
+            novelaiBtn.disabled = true; // [추가]
             aiResultEl.textContent = `${modelName} 모델 생각 중...`;
 
             try {
@@ -114,8 +127,8 @@
                         'x-my-secret-key': secretKey
                     },
                     body: JSON.stringify({
-                        model: modelName, // [V5] "gemini-pro" 또는 "gemini-flash"
-                        prompt: prompt      // [V5] 프론트엔드가 만든 프롬프트
+                        model: modelName, // "gemini-pro", "gemini-flash" 또는 "novelai-kayra"
+                        prompt: prompt
                     })
                 });
 
@@ -126,19 +139,23 @@
                 }
 
                 const data = await response.json();
-                aiResultEl.textContent = data.text; // (api/generate.js가 text를 반환한다고 가정)
+                aiResultEl.textContent = data.text;
 
             } catch (error) {
                 aiResultEl.textContent = `오류: ${error.message}`;
             } finally {
-                // [2025-10-19] 지침: 버튼 활성화
+                // [2025-10-19] 지침: 버튼 활성화 (NovelAI 버튼 포함)
                 geminiProBtn.disabled = false;
                 geminiFlashBtn.disabled = false;
+                novelaiBtn.disabled = false; // [추가]
             }
         }
 
+        // [수정] 이벤트 리스너
         geminiProBtn.addEventListener('click', () => callSimpleProxy('gemini-2.5-pro'));
         geminiFlashBtn.addEventListener('click', () => callSimpleProxy('gemini-2.5-flash'));
+        // [추가] NovelAI 리스너 (백엔드에서 'novelai'로 시작하는지 검사하므로 'novelai-kayra' 등으로 전송)
+        novelaiBtn.addEventListener('click', () => callSimpleProxy('novelai-kayra'));
 
     </script>
 </body>
