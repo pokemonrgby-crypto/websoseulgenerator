@@ -96,6 +96,23 @@
   function getNovel(){ return load().find(n=>n.id===novelId); }
   function getEpisode(n){ return (n.episodes||[]).find(e=>e.no===episodeNum); }
 
+  // 토스트 알림 함수
+  function showToast(message, type = 'info', duration = 3000) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px;';
+      document.body.appendChild(container);
+    }
+    const colors = { success: '#28a745', error: '#dc3545', info: '#007aff', warning: '#ffc107' };
+    const toast = document.createElement('div');
+    toast.style.cssText = `background:${colors[type]||colors.info};color:white;padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:14px;max-width:350px;`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => { container.removeChild(toast); if(container.children.length===0) document.body.removeChild(container); }, duration);
+  }
+
   // 제목 세팅
   (function initTitle(){
     $('episodeTitle').textContent=`${novelId} - ${episodeNum}화 집필 중`;
@@ -188,7 +205,7 @@ ${userText}`;
 
   generateBtn.addEventListener('click', async ()=>{
     const userText=$('sceneRequest').value;
-    if(!secretKey || !userText) return alert('키 또는 입력이 비어 있어.');
+    if(!secretKey || !userText) return showToast('키 또는 입력이 비어 있습니다.', 'warning');
 
     const stage=($('pipelineStage')||{value:'SKETCH'}).value;
     const model=MODEL_FOR[stage];
@@ -207,8 +224,10 @@ ${userText}`;
       if(stage==='J_DRAFT' || stage==='J_POLISH'){ lastJapaneseDraft=text; }
 
       sceneResultEl.textContent=`[${data.model}] 완료`;
+      showToast(`${stage} 단계 생성 완료!`, 'success');
     }catch(e){
       sceneResultEl.textContent=`오류: ${e.message}`;
+      showToast('오류: ' + e.message, 'error');
     }finally{
       generateBtn.disabled=false; generateBtn.textContent=old;
     }
@@ -216,28 +235,28 @@ ${userText}`;
 
   // 원문 복사
   $('copyJapaneseButton').addEventListener('click', async ()=>{
-    if(!lastJapaneseDraft) return alert('아직 일본어 본문이 없어.');
+    if(!lastJapaneseDraft) return showToast('아직 일본어 본문이 없습니다.', 'warning');
     await navigator.clipboard.writeText(lastJapaneseDraft);
-    alert('일본어 원문 복사 완료!');
+    showToast('일본어 원문 복사 완료!', 'success');
   });
 
   // 본문 저장(로컬)
   $('saveContentButton').addEventListener('click', ()=>{
-    const arr=load(); const n=arr.find(x=>x.id===novelId); if(!n) return;
-    const ep=getEpisode(n); if(!ep) return;
+    const arr=load(); const n=arr.find(x=>x.id===novelId); if(!n) return showToast('소설을 찾을 수 없습니다.', 'error');
+    const ep=getEpisode(n); if(!ep) return showToast('회차를 찾을 수 없습니다.', 'error');
     const blocks=[...document.querySelectorAll('#novel-blocks p')].map(p=>p.textContent);
     ep.content = blocks.join('\n\n');
     ep.updatedAt=Date.now(); n.updatedAt=Date.now(); save(arr);
-    alert('본문 저장 완료!');
+    showToast('본문 저장 완료!', 'success');
   });
 
   // 회차 DB 저장(로컬)
   $('saveEpisodeDbButton').addEventListener('click', ()=>{
-    const arr=load(); const n=arr.find(x=>x.id===novelId); if(!n) return;
-    const ep=getEpisode(n); if(!ep) return;
+    const arr=load(); const n=arr.find(x=>x.id===novelId); if(!n) return showToast('소설을 찾을 수 없습니다.', 'error');
+    const ep=getEpisode(n); if(!ep) return showToast('회차를 찾을 수 없습니다.', 'error');
     ep.episodeDB = $('dbAfter').value;
     ep.updatedAt=Date.now(); n.updatedAt=Date.now(); save(arr);
-    alert('회차 DB 저장 완료!');
+    showToast('회차 DB 저장 완료!', 'success');
   });
 
   // 편의 프롬프트(Flash-lite)
@@ -245,15 +264,17 @@ ${userText}`;
   const proxyResultEl=document.getElementById('proxyResult');
   proxyBtn.addEventListener('click', async ()=>{
     const prompt=document.getElementById('proxyPrompt').value;
-    if(!secretKey || !prompt) return alert('키 또는 프롬프트가 없어.');
+    if(!secretKey || !prompt) return showToast('키 또는 프롬프트가 없습니다.', 'warning');
     proxyBtn.disabled=true;
     const oldText = proxyBtn.textContent;
     proxyBtn.textContent = '전송 중...';
     try{
       const data=await callProxy('gemini-2.5-flash-lite', prompt, secretKey);
       proxyResultEl.textContent=data.text||'';
+      showToast('응답 완료', 'success');
     }catch(e){
       proxyResultEl.textContent=`오류: ${e.message}`;
+      showToast('오류 발생: ' + e.message, 'error');
     }finally{
       proxyBtn.disabled=false;
       proxyBtn.textContent = oldText;
