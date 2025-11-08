@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>소설 대시보드 (V6)</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 30px; }
+        h1, h2 { text-align: center; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        
+        /* DB 관리 영역 */
+        .db-management {
+            background: #fff; border-radius: 12px; padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 30px;
+        }
+        .db-management textarea {
+            width: 100%; height: 200px; border-radius: 8px;
+            border: 1px solid #ddd; font-family: 'Courier New', monospace;
+        }
+        .db-management button {
+            background: #007aff; color: white; border: none;
+            padding: 10px 15px; border-radius: 8px; cursor: pointer;
+        }
+
+        /* 회차 카드 렌더링 */
+        .episode-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .episode-card, .add-episode-card {
+            background: #fff; border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            padding: 20px; text-align: center; cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .episode-card:hover { transform: translateY(-4px); }
+        .add-episode-card { border: 2px dashed #007aff; color: #007aff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="novelTitle">... (소설 제목)</h1>
+        
+        <div class="db-management">
+            <h2>캐릭터/세계관 DB (Master)</h2>
+            <p style="color: #666; margin-bottom: 10px;">
+                (이 소설의 '현재' 마스터 데이터입니다. AI는 이 DB를 기반으로 기획합니다.)
+            </p>
+            <textarea id="masterDb">
+                {"characters": [{"name": "A", "status": "팔 있음"}]}
+            </textarea>
+            <button id="saveDbButton">💾 마스터 DB 저장</button>
+        </div>
+
+        <h2>회차 목록</h2>
+        
+        <div class="episode-grid">
+            <div class="episode-card" onclick="goToEditor(1)">
+                <h3>1화. 각성</h3>
+                <p>수정일: 2025-11-08</p>
+            </div>
+            
+            <div class="add-episode-card" id="addEpisodeButton">
+                <h3>+ 새 회차 추가</h3>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const novelId = new URLSearchParams(window.location.search).get('id');
+        document.getElementById('novelTitle').textContent = `${novelId} (관리)`;
+        
+        // (DB에서 novelId에 해당하는 마스터 DB 로드 로직)
+        
+        document.getElementById('saveDbButton').addEventListener('click', () => {
+            // (DB에 마스터 DB 저장 로직)
+            alert("마스터 DB가 저장되었습니다.");
+        });
+
+        document.getElementById('addEpisodeButton').addEventListener('click', () => {
+            // (DB에 새 회차 생성)
+            const newEpisodeNum = 2; // (DB에서 마지막 회차 + 1)
+            goToEditor(newEpisodeNum);
+        });
+
+        function goToEditor(episodeNum) {
+            location.href = `editor.html?id=${novelId}&ep=${episodeNum}`;
+        }
+    </script>
+</body>
+</html>
