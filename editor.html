@@ -3,159 +3,165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>편집기 (V5.1)</title>
+    <title>집필실 (V6)</title>
     <style>
-        /* (스타일은 V5와 동일) */
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; }
+        body { font-family: -apple-system, sans-serif; background: #f0f2f5; }
         .editor-layout {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 20px;
-            max-width: 1600px;
-            margin: 0 auto;
-            background: #fff;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-            height: calc(100vh - 80px);
+            display: grid; grid-template-columns: 1fr 350px;
+            gap: 20px; padding: 20px;
+            max-width: 1600px; margin: 0 auto;
+            height: calc(100vh - 40px);
         }
-        .sidebar { overflow-y: auto; }
-        .main-content { overflow-y: auto; }
-        h1, h2 { margin-bottom: 15px; }
-        textarea {
-            width: 100%;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            min-height: 150px;
-            font-family: 'Courier New', monospace;
+        .main-content {
+            background: #fff; border-radius: 12px; padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow-y: auto;
         }
-        #novel-blocks {
-            border: 1px solid #ddd;
-            min-height: 400px;
-            padding: 10px;
-            border-radius: 8px;
+        .sidebar {
+            background: #fff; border-radius: 12px; padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow-y: auto;
         }
-        #novel-blocks p:hover { background-color: #f0f8ff; cursor: pointer; }
-        
+        h2 { margin-top: 0; }
         button {
             background: #007aff; color: white; border: none;
-            padding: 10px 15px; border-radius: 8px;
-            cursor: pointer; margin-right: 10px; margin-top: 5px; /* 여백 추가 */
+            padding: 10px 15px; border-radius: 8px; cursor: pointer;
+            margin-right: 5px; margin-bottom: 5px; width: 100%;
         }
         button:disabled { background: #999; }
-        /* [추가] NovelAI 버튼을 위한 별도 스타일 */
-        button.novelai {
-            background: #8b5cf6; /* 보라색 계열 */
-        }
-        button.novelai:hover:not(:disabled) {
-            background: #7c3aed;
+        textarea { width: 100%; height: 100px; border-radius: 8px; border: 1px solid #ddd; }
+        
+        /* 블록 에디터 */
+        #novel-blocks { min-height: 400px; }
+        #novel-blocks p { padding: 4px 8px; border-radius: 4px; }
+        #novel-blocks p:hover { background-color: #f0f8ff; }
+
+        /* AI 기능 버튼 */
+        button.main-ai { background: #28a745; font-weight: bold; padding: 12px; }
+        button.sub-ai { background: #6c757d; font-size: 12px; padding: 8px; }
+        
+        /* 회차 내 DB (변경 전/후) */
+        .episode-db {
+            border: 1px dashed #aaa; padding: 10px; border-radius: 8px;
+            background: #fafafa;
         }
     </style>
 </head>
 <body>
-    <h1 id="novelTitle" style="text-align: center;">... (소설 제목 로딩 중)</h1>
-
     <div class="editor-layout">
-        <div class="sidebar">
-            <h2>세계관 DB (JSON)</h2>
-            <textarea id="worldviewDb" placeholder="여기에 이 소설만의 캐릭터, 장소, 규칙 등을 자유로운 JSON/텍스트 형식으로 입력합니다..."></textarea>
-            
-            <hr style="margin: 20px 0;">
-            
-            <h2>AI 기능 (Simple Proxy)</h2>
-            <textarea id="promptInput" placeholder="AI에게 시킬 작업을 입력하세요..."></textarea>
-            
-            <div>
-                <button id="geminiProButton">Gemini Pro로 실행</button>
-                <button id="geminiFlashButton">Gemini Flash로 실행</button>
-                <button id="novelaiButton" class="novelai">NovelAI (Kayra)로 실행</button>
-            </div>
-
-            <pre id="aiResult" style="background: #eee; padding: 10px; margin-top: 15px;"></pre>
-        </div>
-
         <div class="main-content">
-            <h2>본문 (블록 단위)</h2>
+            <h2 id="episodeTitle">... (회차 제목)</h2>
             <div id="novel-blocks">
                 <p>A가 사과를 주웠다.</p>
                 <p>&nbsp;</p>
                 <p>"음, 달콤한 향기가 나네?"</p>
                 </div>
         </div>
+
+        <div class="sidebar">
+            <h2>AI 기능</h2>
+
+            <fieldset style="border: 2px solid #28a745; border-radius: 8px; padding: 10px;">
+                <legend>핵심 기능 (3단계)</legend>
+                <textarea id="sceneRequest" placeholder="생성할 씬을 요청하세요.&#10;예: A가 B를 만나는 씬."></textarea>
+                <button id="generateSceneButton" class="main-ai">✨ 씬 생성하기 (3단계)</button>
+                <pre id="sceneResult" style="background: #f0f0f0; padding: 5px;"></pre>
+            </fieldset>
+
+            <hr style="margin: 20px 0;">
+
+            <fieldset style="border: 1px solid #6c757d; border-radius: 8px; padding: 10px;">
+                <legend>편의 기능 (Proxy)</legend>
+                <textarea id="proxyPrompt" placeholder="일관성 확인 등 간단한 질문&#10;예: A의 말투는?"></textarea>
+                <button id="proxyButton" class="sub-ai">Gemini-Flash로 질문 (Proxy)</button>
+                <pre id="proxyResult" style="background: #f0f0f0; padding: 5px;"></pre>
+            </fieldset>
+            
+            <hr style="margin: 20px 0;">
+
+            <div class="episode-db">
+                <h3>이 회차의 캐릭터 변경</h3>
+                <label>변경 전 (참고용):</label>
+                <textarea id="dbBefore" readonly>{"name": "A", "status": "팔 있음"}</textarea>
+                <label>변경 후 (AI가 참고):</label>
+                <textarea id="dbAfter">{"name": "A", "status": "팔 잃음"}</textarea>
+                <button id="saveEpisodeDbButton" class="sub-ai">회차 DB 저장</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        // /editor.html - JavaScript 로직
+        const novelId = new URLSearchParams(window.location.search).get('id');
+        const episodeNum = new URLSearchParams(window.location.search).get('ep');
+        document.getElementById('episodeTitle').textContent = `${novelId} - ${episodeNum}화 집필 중`;
+
+        const secretKey = localStorage.getItem('MY_SECRET_KEY'); // (인증 키)
+
+        // --- [핵심 기능] 3단계 파이프라인 호출 ---
+        const generateBtn = document.getElementById('generateSceneButton');
+        const sceneResultEl = document.getElementById('sceneResult');
         
-        // (1. 소설 ID 파싱 및 데이터 로드 - V5와 동일)
-        window.addEventListener('DOMContentLoaded', () => {
-            const novelId = new URLSearchParams(window.location.search).get('id');
-            // TODO: DB에서 novelId로 소설 데이터(제목, DB, 블록) 로드
-            document.getElementById('novelTitle').textContent = `(편집 중) ${novelId}`;
-            // ...
+        generateBtn.addEventListener('click', async () => {
+            const sceneRequest = document.getElementById('sceneRequest').value;
+            // (이 회차의 DB(dbAfter)와 마스터 DB를 조합하여 전송)
+            const worldviewDatabase = document.getElementById('dbAfter').value;
+            
+            if (!secretKey || !sceneRequest) return alert("키 또는 씬 요청이 없습니다.");
+
+            // [2025-10-19] 버튼 비활성화
+            generateBtn.disabled = true;
+            generateBtn.textContent = "생성 중 (3단계)...";
+            
+            try {
+                // [API 분리] /api/generate_scene 호출
+                const res = await fetch('/api/generate_scene', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'x-my-secret-key': secretKey},
+                    body: JSON.stringify({ sceneRequest, worldviewDatabase })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                
+                // (블록 에디터에 결과 추가)
+                data.blocks.forEach(line => {
+                    const p = document.createElement('p');
+                    p.textContent = line || ' ';
+                    document.getElementById('novel-blocks').appendChild(p);
+                });
+                sceneResultEl.textContent = JSON.stringify(data.instructions, null, 2);
+
+            } catch (e) {
+                sceneResultEl.textContent = `오류: ${e.message}`;
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = "✨ 씬 생성하기 (3단계)";
+            }
         });
 
-        // (2. [V5.1] Simple Proxy 호출 로직 수정)
+        // --- [편의 기능] Simple Proxy 호출 ---
+        const proxyBtn = document.getElementById('proxyButton');
+        const proxyResultEl = document.getElementById('proxyResult');
         
-        // [수정] 버튼 ID 가져오기
-        const geminiProBtn = document.getElementById('geminiProButton');
-        const geminiFlashBtn = document.getElementById('geminiFlashButton');
-        const novelaiBtn = document.getElementById('novelaiButton'); // [추가]
-        
-        const aiResultEl = document.getElementById('aiResult');
-        const promptInput = document.getElementById('promptInput');
+        proxyBtn.addEventListener('click', async () => {
+            const prompt = document.getElementById('proxyPrompt').value;
+            if (!secretKey || !prompt) return alert("키 또는 프롬프트가 없습니다.");
 
-        async function callSimpleProxy(modelName) {
-            const secretKey = localStorage.getItem('MY_SECRET_KEY');
-            const prompt = promptInput.value;
-
-            if (!secretKey) return alert('인증 키가 없습니다. (index.html에서 저장 필요)');
-            if (!prompt) return alert('프롬프트를 입력하세요.');
-
-            // [2025-10-19] 지침: 버튼 비활성화 (NovelAI 버튼 포함)
-            geminiProBtn.disabled = true;
-            geminiFlashBtn.disabled = true;
-            novelaiBtn.disabled = true; // [추가]
-            aiResultEl.textContent = `${modelName} 모델 생각 중...`;
+            proxyBtn.disabled = true;
 
             try {
-                const response = await fetch('/api/generate', {
+                // [API 분리] /api/simple_proxy 호출
+                const res = await fetch('/api/simple_proxy', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-my-secret-key': secretKey
-                    },
-                    body: JSON.stringify({
-                        model: modelName, // "gemini-pro", "gemini-flash" 또는 "novelai-kayra"
-                        prompt: prompt
-                    })
+                    headers: {'Content-Type': 'application/json', 'x-my-secret-key': secretKey},
+                    body: JSON.stringify({ model: 'gemini-2.5-flash', prompt })
                 });
-
-                if (!response.ok) {
-                    if (response.status === 401) throw new Error('401 인증 실패');
-                    const err = await response.json();
-                    throw new Error(err.error || 'API 호출 실패');
-                }
-
-                const data = await response.json();
-                aiResultEl.textContent = data.text;
-
-            } catch (error) {
-                aiResultEl.textContent = `오류: ${error.message}`;
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                proxyResultEl.textContent = data.text;
+            } catch (e) {
+                proxyResultEl.textContent = `오류: ${e.message}`;
             } finally {
-                // [2025-10-19] 지침: 버튼 활성화 (NovelAI 버튼 포함)
-                geminiProBtn.disabled = false;
-                geminiFlashBtn.disabled = false;
-                novelaiBtn.disabled = false; // [추가]
+                proxyBtn.disabled = false;
             }
-        }
-
-        // [수정] 이벤트 리스너
-        geminiProBtn.addEventListener('click', () => callSimpleProxy('gemini-2.5-pro'));
-        geminiFlashBtn.addEventListener('click', () => callSimpleProxy('gemini-2.5-flash'));
-        // [추가] NovelAI 리스너 (백엔드에서 'novelai'로 시작하는지 검사하므로 'novelai-kayra' 등으로 전송)
-        novelaiBtn.addEventListener('click', () => callSimpleProxy('novelai-kayra'));
+        });
 
     </script>
 </body>
