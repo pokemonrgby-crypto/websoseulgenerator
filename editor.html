@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>집필실 (V6)</title>
+    <title>집필실 (V6.1 - API 수정)</title>
     <style>
         body { font-family: -apple-system, sans-serif; background: #f0f2f5; }
         .editor-layout {
@@ -60,18 +60,18 @@
             <h2>AI 기능</h2>
 
             <fieldset style="border: 2px solid #28a745; border-radius: 8px; padding: 10px;">
-                <legend>핵심 기능 (3단계)</legend>
-                <textarea id="sceneRequest" placeholder="생성할 씬을 요청하세요.&#10;예: A가 B를 만나는 씬."></textarea>
-                <button id="generateSceneButton" class="main-ai">✨ 씬 생성하기 (3단계)</button>
+                <legend>핵심 기능 (프롬프트 작성)</legend>
+                <textarea id="sceneRequest" placeholder="[핵심 프롬프트]&#10;여기에 3단계 파이프라인 프롬프트를 직접 입력하거나,&#10;AI가 생성할 씬을 요청하세요.&#10;모델은 (예: Gemini Pro)로 전송됩니다."></textarea>
+                <button id="generateSceneButton" class="main-ai">✨ 핵심 프롬프트 전송 (예: Pro)</button>
                 <pre id="sceneResult" style="background: #f0f0f0; padding: 5px;"></pre>
             </fieldset>
 
             <hr style="margin: 20px 0;">
 
             <fieldset style="border: 1px solid #6c757d; border-radius: 8px; padding: 10px;">
-                <legend>편의 기능 (Proxy)</legend>
-                <textarea id="proxyPrompt" placeholder="일관성 확인 등 간단한 질문&#10;예: A의 말투는?"></textarea>
-                <button id="proxyButton" class="sub-ai">Gemini-Flash로 질문 (Proxy)</button>
+                <legend>편의 기능 (프롬프트 작성)</legend>
+                <textarea id="proxyPrompt" placeholder="[편의 프롬프트]&#10;일관성 확인 등 간단한 질문&#10;예: A의 말투는?&#10;모델은 (예: Gemini Flash)로 전송됩니다."></textarea>
+                <button id="proxyButton" class="sub-ai">편의 프롬프트 전송 (예: Flash)</button>
                 <pre id="proxyResult" style="background: #f0f0f0; padding: 5px;"></pre>
             </fieldset>
             
@@ -95,48 +95,51 @@
 
         const secretKey = localStorage.getItem('MY_SECRET_KEY'); // (인증 키)
 
-        // --- [핵심 기능] 3단계 파이프라인 호출 ---
+        // --- [핵심 기능] Simple Proxy 호출 (Pro 모델 예시) ---
         const generateBtn = document.getElementById('generateSceneButton');
         const sceneResultEl = document.getElementById('sceneResult');
         
         generateBtn.addEventListener('click', async () => {
-            const sceneRequest = document.getElementById('sceneRequest').value;
-            // (이 회차의 DB(dbAfter)와 마스터 DB를 조합하여 전송)
-            const worldviewDatabase = document.getElementById('dbAfter').value;
+            const prompt = document.getElementById('sceneRequest').value;
+            // (이 회차의 DB(dbAfter)와 마스터 DB를 조합하여 프롬프트에 포함시킬 수 있음)
+            // const worldviewDatabase = document.getElementById('dbAfter').value;
+            // const fullPrompt = worldviewDatabase + "\n\n" + prompt;
             
-            if (!secretKey || !sceneRequest) return alert("키 또는 씬 요청이 없습니다.");
+            if (!secretKey || !prompt) return alert("키 또는 씬 요청이 없습니다.");
 
             // [2025-10-19] 버튼 비활성화
             generateBtn.disabled = true;
-            generateBtn.textContent = "생성 중 (3단계)...";
+            generateBtn.textContent = "생성 중...";
             
             try {
-                // [API 분리] /api/generate_scene 호출
-                const res = await fetch('/api/generate_scene', {
+                // [수정] V5의 Simple Proxy API('/api/generate')를 호출
+                const res = await fetch('/api/generate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'x-my-secret-key': secretKey},
-                    body: JSON.stringify({ sceneRequest, worldviewDatabase })
+                    body: JSON.stringify({ 
+                        model: 'gemini-2.5-pro', // 프론트엔드가 모델 결정
+                        prompt: prompt           // 프론트엔드가 프롬프트 결정
+                    })
                 });
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json();
                 
                 // (블록 에디터에 결과 추가)
-                data.blocks.forEach(line => {
-                    const p = document.createElement('p');
-                    p.textContent = line || ' ';
-                    document.getElementById('novel-blocks').appendChild(p);
-                });
-                sceneResultEl.textContent = JSON.stringify(data.instructions, null, 2);
+                const p = document.createElement('p');
+                p.textContent = data.text || ' ';
+                document.getElementById('novel-blocks').appendChild(p);
+                
+                sceneResultEl.textContent = `[${data.model}] 응답 완료.`;
 
             } catch (e) {
                 sceneResultEl.textContent = `오류: ${e.message}`;
             } finally {
                 generateBtn.disabled = false;
-                generateBtn.textContent = "✨ 씬 생성하기 (3단계)";
+                generateBtn.textContent = "✨ 핵심 프롬프트 전송 (예: Pro)";
             }
         });
 
-        // --- [편의 기능] Simple Proxy 호출 ---
+        // --- [편의 기능] Simple Proxy 호출 (Flash 모델 예시) ---
         const proxyBtn = document.getElementById('proxyButton');
         const proxyResultEl = document.getElementById('proxyResult');
         
@@ -147,11 +150,14 @@
             proxyBtn.disabled = true;
 
             try {
-                // [API 분리] /api/simple_proxy 호출
-                const res = await fetch('/api/simple_proxy', {
+                // [수정] V5의 Simple Proxy API('/api/generate')를 호출
+                const res = await fetch('/api/generate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'x-my-secret-key': secretKey},
-                    body: JSON.stringify({ model: 'gemini-2.5-flash', prompt })
+                    body: JSON.stringify({ 
+                        model: 'gemini-2.5-flash', // 프론트엔드가 모델 결정
+                        prompt: prompt             // 프론트엔드가 프롬프트 결정
+                    })
                 });
                 if (!res.ok) throw new Error(await res.text());
                 const data = await res.json();
