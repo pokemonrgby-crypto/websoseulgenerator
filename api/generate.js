@@ -10,10 +10,10 @@ const ALLOWED_MODELS = new Set([
 ]);
 
 // NovelAI 최신/최상 모델 설정 (규칙 #0: 인터넷 검색 결과 반영)
-// [수정] 'glm-4.6'은 유효하지 않은 enum으로 확인됨. 'kayra-v1'로 롤백.
-const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'kayra-v1'; 
-// [수정] API가 최대 2048을 초과하는 max_length를 거부함. (기존 4000)
-const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '2048', 10);
+// [수정] 최신 모델 'GLM-4.6'으로 변경 (kayra-v1 -> glm-4.6)
+const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'glm-4.6'; 
+// [수정] 최신 모델의 확장된 컨텍스트 크기(8192 토큰) 반영 (2048 -> 8192)
+const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '8192', 10);
 
 // (fetchWithRetry 함수는 이전과 동일)
 async function fetchWithRetry(url, options, maxRetries = 3) {
@@ -118,7 +118,10 @@ export default async function handler(req, res) {
       if (!novelaiApiKey) {
         return res.status(500).json({ error: '서버 설정 오류: NovelAI API 키가 없습니다.' });
       }
-      const naiUrl = 'https://api.novelai.net/ai/generate';
+      
+      // [수정] NovelAI API 엔드포인트 도메인 변경 (이전 수정 반영)
+      const naiUrl = 'https.novelai.net/ai/generate'; // text.novelai.net
+      
       const nRes = await fetchWithRetry(naiUrl, {
         method:'POST',
         headers:{
@@ -127,12 +130,11 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           input: prompt,
-          model: NAI_LATEST_MODEL,
+          model: NAI_LATEST_MODEL, // 'glm-4.6' 적용
           parameters: { 
             temperature: 1.0,
-            // [신규] min_length를 명시적으로 1로 설정하여 400 오류 해결
             min_length: 1, 
-            max_length: NAI_MAX_LENGTH
+            max_length: NAI_MAX_LENGTH // '8192' 적용
           }
         })
       });
