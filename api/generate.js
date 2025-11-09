@@ -10,16 +10,15 @@ const ALLOWED_MODELS = new Set([
 ]);
 
 // NovelAI 최신/최상 모델 설정 (규칙 #0: 인터넷 검색 결과 반영)
-// [수정] 최신 모델 'GLM-4.6'으로 변경 (kayra-v1 -> glm-4.6)
 const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'glm-4.6'; 
-// [수정] 최신 모델의 확장된 컨텍스트 크기(8192 토큰) 반영 (2048 -> 8192)
 const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '8192', 10);
 
 // (fetchWithRetry 함수는 이전과 동일)
 async function fetchWithRetry(url, options, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const response = await fetch(url, options);
+      // [수정] new URL() 호출이 여기서 발생하므로 fetch(url, options)에서 오류 발생
+      const response = await fetch(url, options); 
       if (response.ok) return response;
       if (response.status === 429 || response.status >= 500) {
         if (i < maxRetries - 1) {
@@ -37,7 +36,8 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
-      throw err;
+      // [수정] Invalid URL 오류가 여기서 catch 됨
+      throw err; 
     }
   }
 }
@@ -119,8 +119,8 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: '서버 설정 오류: NovelAI API 키가 없습니다.' });
       }
       
-      // [수정] NovelAI API 엔드포인트 도메인 변경 (이전 수정 반영)
-      const naiUrl = 'https.novelai.net/ai/generate'; // text.novelai.net
+      // [수정] 'https.novelai.net' -> 'https://text.novelai.net' (프로토콜 슬래시 및 서브도메인 수정)
+      const naiUrl = 'https://text.novelai.net/ai/generate';
       
       const nRes = await fetchWithRetry(naiUrl, {
         method:'POST',
@@ -130,11 +130,11 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           input: prompt,
-          model: NAI_LATEST_MODEL, // 'glm-4.6' 적용
+          model: NAI_LATEST_MODEL, // 'glm-4.6'
           parameters: { 
             temperature: 1.0,
             min_length: 1, 
-            max_length: NAI_MAX_LENGTH // '8192' 적용
+            max_length: NAI_MAX_LENGTH // 8192
           }
         })
       });
