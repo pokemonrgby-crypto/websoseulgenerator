@@ -13,7 +13,6 @@ const ALLOWED_MODELS = new Set([
 const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'glm-4-6'; 
 // Vercel 환경 변수(NOVELAI_MAX_LENGTH)를 우선으로 하되, 
 // 코드를 직접 배포할 경우의 기본값도 2048으로 설정합니다. (API 최대 4096)
-// [수정] OpenAI 호환 API는 max_tokens를 사용합니다. (이름은 유지하되 값으로만 활용)
 const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '2048', 10);
 
 // (fetchWithRetry 함수는 이전과 동일)
@@ -122,9 +121,8 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: '서버 설정 오류: NovelAI API 키가 없습니다.' });
       }
       
-      // [수정] 'glm-4-6' 모델은 OpenAI 호환 API 엔드포인트를 사용해야 합니다.
-      // const naiUrl = 'https://text.novelai.net/ai/generate'; // (기존 주소)
-      const naiUrl = 'https://text.novelai.net/oa/v1/chat/completions'; // (OpenAI 호환 주소)
+      // OpenAI 호환 엔드포인트
+      const naiUrl = 'https://text.novelai.net/oa/v1/chat/completions'; 
       
       const nRes = await fetchWithRetry(naiUrl, {
         method:'POST',
@@ -132,7 +130,7 @@ export default async function handler(req, res) {
           'Content-Type':'application/json',
           'Authorization': `Bearer ${novelaiApiKey}`
         },
-        // [수정] OpenAI 호환 'messages' 형식으로 본문 변경
+        // OpenAI 'messages' 형식 + NovelAI 고유 파라미터(max_length) 조합
         body: JSON.stringify({
           model: NAI_LATEST_MODEL, // 'glm-4-6'
           messages: [
@@ -141,28 +139,26 @@ export default async function handler(req, res) {
               "content": prompt
             }
           ],
+          // [수정] 500 오류 대응: 'max_tokens' 대신 NovelAI 고유 파라미터 'max_length' 사용
           temperature: 1.0,
-          // [수정] OpenAI 호환 파라미터명 'max_tokens' 사용
-          max_tokens: NAI_MAX_LENGTH // 2048 (Vercel 변수 우선)
+          max_length: NAI_MAX_LENGTH, // 2048 (Vercel 변수 우선)
+          min_length: 1 // (기존 코드에 있던 파라미터 복원)
         })
       });
 
       if (!nRes.ok) {
         const t = await nRes.text();
-         // [개선] 403 오류를 명확히 전달
-         if (nRes.status === 403) {
-              try {
-                 const errorJson = JSON.parse(t);
-                 // "model 'glm-4-6' is only available..." 메시지 다시 포함
-                 throw new Error(`NovelAI 호출 실패 (403): ${errorJson.message || t}`);
-              } catch(e) { throw new Error(`NovelAI 호출 실패 (403): ${t}`); }
+        // [개선] 500 오류를 명확히 전달
+         try {
+             const errorJson = JSON.parse(t);
+             throw new Error(`NovelAI 호출 실패 (${nRes.status}): ${errorJson.message || t}`);
+         } catch(e) { 
+             throw new Error(`NovelAI 호출 실패 (${nRes.status}): ${t}`); 
          }
-        throw new Error(`NovelAI 호출 실패: ${t}`);
       }
       const nData = await nRes.json();
 
-      // [수정] OpenAI 호환 응답 구조(choices)에서 텍스트 추출
-      // resultText = nData.output || '(NovelAI 응답 없음)'; // (기존 응답)
+      // OpenAI 호환 응답 구조(choices)에서 텍스트 추출
       if (nData.choices && nData.choices[0]?.message?.content) {
         resultText = nData.choices[0].message.content;
       } else {
