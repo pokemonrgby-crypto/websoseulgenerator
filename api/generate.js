@@ -14,14 +14,12 @@ const ALLOWED_MODELS = new Set([
 const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'glm-4.6'; 
 const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '4000', 10);
 
-// 지수 백오프 재시도 함수
+// (fetchWithRetry 함수는 이전과 동일)
 async function fetchWithRetry(url, options, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
       const response = await fetch(url, options);
       if (response.ok) return response;
-      
-      // 429 또는 5xx 에러 시 재시도
       if (response.status === 429 || response.status >= 500) {
         if (i < maxRetries - 1) {
           const delay = Math.pow(2, i) * 1000; // 1s, 2s, 4s
@@ -44,7 +42,7 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 }
 
 export default async function handler(req, res) {
-  // CORS
+  // (CORS, 인증, 입력 검사 로직은 이전과 동일)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-my-secret-key');
@@ -52,7 +50,6 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: '허용되지 않는 메서드입니다.' });
 
   try {
-    // 1) 인증
     const clientSecretKey = req.headers['x-my-secret-key'];
     const serverSecretKey = process.env.MY_SECRET_KEY;
     if (!clientSecretKey || clientSecretKey !== serverSecretKey) {
@@ -60,7 +57,6 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: '인증 실패: 경비실 문 열쇠가 올바르지 않습니다.' });
     }
 
-    // 2) 입력 검사
     const { model, prompt } = req.body || {};
     if (!model || !prompt) {
       return res.status(400).json({ error: 'model과 prompt는 필수 항목입니다.' });
@@ -85,7 +81,8 @@ export default async function handler(req, res) {
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
         { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
         { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_DANGSROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
+        // [수정] "DANGSROUS" -> "DANGEROUS"
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
       ];
 
       const gRes = await fetchWithRetry(geminiUrl, {
@@ -100,16 +97,25 @@ export default async function handler(req, res) {
 
       if (!gRes.ok) {
         const errorText = await gRes.text();
-        throw new Error(`Gemini(${modelName}) 호출 실패: ${errorText}`);
+        // [개선] 에러를 JSON으로 파싱하여 클라이언트에 더 나은 정보 제공
+        try {
+            const errorJson = JSON.parse(errorText);
+            throw new Error(errorJson.error?.message || errorText);
+        } catch(e) {
+            throw new Error(`Gemini(${modelName}) 호출 실패: ${errorText}`);
+        }
       }
       const data = await gRes.json();
       if (data.candidates && data.candidates[0]?.content?.parts) {
         resultText = data.candidates[0].content.parts.map(p => p.text || '').join('');
+      } else if (data.candidates && data.candidates[0]?.finishReason === 'SAFETY') {
+        resultText = '(Gemini 안전 필터에 의해 차단된 응답입니다.)';
       } else {
         resultText = '(Gemini 응답 없음)';
       }
 
     } else if (model === 'novelai') {
+      // (NovelAI 로직은 이전과 동일)
       const novelaiApiKey = process.env.NOVELAI_API_KEY;
       if (!novelaiApiKey) {
         return res.status(500).json({ error: '서버 설정 오류: NovelAI API 키가 없습니다.' });
@@ -123,10 +129,10 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           input: prompt,
-          model: NAI_LATEST_MODEL,  // 환경변수로 관리되는 최신/최상 모델
+          model: NAI_LATEST_MODEL,
           parameters: { 
             temperature: 1.0, 
-            max_length: NAI_MAX_LENGTH  // 3000-4000자 목표 (환경변수)
+            max_length: NAI_MAX_LENGTH
           }
         })
       });
@@ -146,6 +152,7 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('Proxy 오류:', err);
+    // [개선] err.message를 details로 전송
     return res.status(500).json({ error: '서버에서 오류가 발생했습니다.', details: err.message });
   }
 }
