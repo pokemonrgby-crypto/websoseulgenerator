@@ -6,14 +6,15 @@ const ALLOWED_MODELS = new Set([
   'gemini-2.5-pro',
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
-  'novelai'
+  'novelai' // novelai 선택 시 에라토 호출
 ]);
 
-// NovelAI: ERATO(텍스트 API) 기본값
-const NAI_TEXT_MODEL = process.env.NOVELAI_TEXT_MODEL || 'erato'; // Opus 전용
-const NAI_TEXT_MAX_LENGTH = parseInt(process.env.NOVELAI_TEXT_MAX_LENGTH || '1024', 10);
+// NovelAI 텍스트 모델: Opus에서 Erato 권장
+const NAI_LATEST_MODEL = (process.env.NOVELAI_MODEL || 'erato');
+// 기본 2048 (환경변수 NOVELAI_MAX_LENGTH가 있으면 우선)
+const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '2048', 10);
 
-// (fetchWithRetry 함수는 이전과 동일)
+// 공용 재시도 fetch
 async function fetchWithRetry(url, options, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -41,7 +42,7 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
 }
 
 export default async function handler(req, res) {
-  // (CORS, 인증, 입력 검사 로직은 이전과 동일)
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-my-secret-key');
@@ -49,6 +50,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: '허용되지 않는 메서드입니다.' });
 
   try {
+    // 간단 인증
     const clientSecretKey = req.headers['x-my-secret-key'];
     const serverSecretKey = process.env.MY_SECRET_KEY;
     if (!clientSecretKey || clientSecretKey !== serverSecretKey) {
@@ -66,7 +68,7 @@ export default async function handler(req, res) {
 
     let resultText = '';
 
-    // 3) 분기
+    // --- Gemini 분기 ---
     if (model.startsWith('gemini')) {
       const geminiApiKey = process.env.GEMINI_API_KEY;
       if (!geminiApiKey) {
@@ -75,7 +77,6 @@ export default async function handler(req, res) {
       const modelName = model;
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiApiKey}`;
 
-      // 안전 필터 적용
       const safetySettings = [
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
         { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
@@ -104,7 +105,6 @@ export default async function handler(req, res) {
       }
 
       const data = await gRes.json();
-
       if (data.candidates && data.candidates[0]?.content?.parts) {
         resultText = data.candidates[0].content.parts.map(p => p.text || '').join('');
       } else if (data.candidates && data.candidates[0]?.finishReason === 'SAFETY') {
@@ -113,31 +113,15 @@ export default async function handler(req, res) {
         resultText = '(Gemini 응답 없음)';
       }
 
+    // --- NovelAI(Erato) 분기 ---
     } else if (model === 'novelai') {
       const novelaiApiKey = process.env.NOVELAI_API_KEY;
       if (!novelaiApiKey) {
         return res.status(500).json({ error: '서버 설정 오류: NovelAI API 키가 없습니다.' });
       }
 
-      // NovelAI 텍스트 API(비-OA) — ERATO 호출
-      const naiUrl = 'https://api.novelai.net/ai/generate';
-
-      const body = {
-        input: prompt,
-        model: NAI_TEXT_MODEL, // 기본 'erato' (Opus 전용)
-        parameters: {
-          temperature: 0.9,
-          max_length: NAI_TEXT_MAX_LENGTH,
-          min_length: 1,
-          top_k: 0,
-          top_p: 0.85,
-          tail_free_sampling: 0.92,
-          repetition_penalty: 1.1,
-          repetition_penalty_range: 2048,
-          // stop_sequences: ['\n\n'],
-          use_string: true
-        }
-      };
+      // 에라토: NovelAI 텍스트 전용 엔드포인트
+      const naiUrl = 'https://text.novelai.net/ai/generate';
 
       const nRes = await fetchWithRetry(naiUrl, {
         method: 'POST',
@@ -145,7 +129,20 @@ export default async function handler(req, res) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${novelaiApiKey}`
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify({
+          input: prompt,
+          model: NAI_LATEST_MODEL, // 'erato'
+          parameters: {
+            max_length: NAI_MAX_LENGTH,
+            min_length: 1,
+            temperature: 1.0,
+            top_p: 0.9,
+            top_k: 0,
+            tail_free_sampling: 0,
+            repetition_penalty: 1.0,
+            mirostat: 0
+          }
+        })
       });
 
       if (!nRes.ok) {
@@ -153,25 +150,29 @@ export default async function handler(req, res) {
         try {
           const errorJson = JSON.parse(t);
           throw new Error(`NovelAI(ERATO) 호출 실패 (${nRes.status}): ${errorJson.message || t}`);
-        } catch {
+        } catch (e) {
           throw new Error(`NovelAI(ERATO) 호출 실패 (${nRes.status}): ${t}`);
         }
       }
 
       const nData = await nRes.json();
+
+      // 호환 넓은 파서
       if (typeof nData.output === 'string' && nData.output.length > 0) {
         resultText = nData.output;
+      } else if (typeof nData.output_text === 'string' && nData.output_text.length > 0) {
+        resultText = nData.output_text;
       } else if (Array.isArray(nData.choices) && nData.choices[0]?.text) {
         resultText = nData.choices[0].text;
       } else {
-        resultText = '(NovelAI(ERATO) 응답 없음)';
+        resultText = '(NovelAI 응답 없음)';
       }
 
     } else {
       return res.status(400).json({ error: `지원하지 않는 모델: ${model}` });
     }
 
-    // 4) 응답
+    // 최종 응답
     return res.status(200).json({ success: true, model, text: resultText });
 
   } catch (err) {
