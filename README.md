@@ -38,7 +38,7 @@
       * `GEMINI_API_KEY`, `NOVELAI_API_KEY` 등 모든 외부 API 키는 **절대** 프론트엔드 코드에 포함시키지 않습니다.
       * 모든 키는 \*\*Vercel 대시보드의 "Environment Variables"\*\*에만 저장하며, 서버리스 함수 내에서 `process.env`를 통해서만 접근합니다.
   * **AI 모델 처리:**
-      * **NovelAI**: 항상 **최신/최상 모델** 사용 (환경변수 `NOVELAI_MODEL`로 관리, 기본값: `kayra-v1`)
+      * **NovelAI**: 항상 **최신/최상 모델** 사용 (환경변수 `NOVELAI_MODEL`로 관리, 기본값: `glm-4.6`)
       * **모델별 역할**:
         - SKETCH (스케치/간단 질의): `gemini-2.5-flash-lite`
         - J_DRAFT/J_POLISH (본문 초안/다듬기): `NovelAI 최신 모델` - **일본어**
@@ -53,7 +53,7 @@
         - `MY_SECRET_KEY`: 개인용 인증 키
         - `GEMINI_API_KEY`: Google Gemini API 키
         - `NOVELAI_API_KEY`: NovelAI API 키
-        - `NOVELAI_MODEL`: NovelAI 모델명 (기본값: `kayra-v1`, 최신 모델로 주기적 업데이트)
+        - `NOVELAI_MODEL`: NovelAI 모델명 (기본값: `glm-4.6`, 최신 모델로 주기적 업데이트)
         - `NOVELAI_MAX_LENGTH`: NovelAI 최대 생성 길이 (기본값: `4000`, 3000-4000자 목표)
 
 -----
