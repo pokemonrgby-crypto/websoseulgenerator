@@ -9,10 +9,11 @@ const ALLOWED_MODELS = new Set([
   'novelai' // novelai 선택 시 에라토 호출
 ]);
 
-// NovelAI 텍스트 모델: Opus에서 Erato 권장
+// NovelAI 텍스트 모델: Erato (Llama 3 70B 기반)
 const NAI_LATEST_MODEL = (process.env.NOVELAI_MODEL || 'erato');
-// 기본 2048 (환경변수 NOVELAI_MAX_LENGTH가 있으면 우선)
-const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '2048', 10);
+// Erato 실제 제한: 150 토큰 (최대 170 토큰까지 문장 완성)
+// 환경변수 NOVELAI_MAX_LENGTH가 있으면 우선하되, 150을 초과하면 경고
+const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '150', 10);
 
 // 공용 재시도 fetch
 async function fetchWithRetry(url, options, maxRetries = 3) {
@@ -133,14 +134,18 @@ export default async function handler(req, res) {
           input: prompt,
           model: NAI_LATEST_MODEL, // 'erato'
           parameters: {
-            max_length: NAI_MAX_LENGTH,
+            max_length: NAI_MAX_LENGTH, // 기본 150, 실제 제한 150-170
             min_length: 1,
             temperature: 1.0,
             top_p: 0.9,
             top_k: 0,
             tail_free_sampling: 0,
             repetition_penalty: 1.0,
-            mirostat: 0
+            repetition_penalty_range: 2048,
+            repetition_penalty_slope: 0,
+            repetition_penalty_frequency: 0,
+            repetition_penalty_presence: 0,
+            order: [0, 1, 2, 3]
           }
         })
       });

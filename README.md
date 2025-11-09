@@ -54,7 +54,7 @@
         - `GEMINI_API_KEY`: Google Gemini API 키
         - `NOVELAI_API_KEY`: NovelAI API 키
         - `NOVELAI_MODEL`: NovelAI 모델명 (기본값: `erato`, 최신 모델로 주기적 업데이트)
-        - `NOVELAI_MAX_LENGTH`: NovelAI 최대 생성 길이 (기본값: `2048`, 토큰 단위)
+        - `NOVELAI_MAX_LENGTH`: NovelAI 최대 생성 길이 (기본값: `150`, 토큰 단위, 실제 제한 150-170)
 
 -----
 
@@ -87,7 +87,13 @@
 
 #### 4.1. Erato 모델 개요
 
-**Erato**는 NovelAI의 최신 텍스트 생성 모델입니다. 이전 모델(Opus, Kayra 등)보다 향상된 자연어 생성 능력과 문맥 이해력을 제공하며, 특히 창작 콘텐츠 생성에 최적화되어 있습니다.
+**Erato**는 NovelAI의 최신 텍스트 생성 모델입니다 (2024년 9월 출시). **Llama 3 70B Base** 모델을 기반으로 파인튜닝되어, 이전 모델(Opus, Kayra 등)보다 향상된 자연어 생성 능력과 문맥 이해력을 제공하며, 특히 창작 콘텐츠 생성에 최적화되어 있습니다.
+
+**주요 특징:**
+- **Context Window**: 8192 토큰 (Opus 티어)
+- **출력 제한**: 단일 생성당 최대 **150 토큰** (문장 완성을 위해 최대 170 토큰까지 생성 가능)
+- **토큰 크기**: 4바이트 (Llama 기반이므로 이전 모델의 2바이트와 다름)
+- **권장 용도**: 창작 소설, 대화형 스토리텔링, 캐릭터 중심 서사
 
 #### 4.2. API 엔드포인트
 
@@ -114,14 +120,18 @@ Authorization: Bearer ${NOVELAI_API_KEY}
   "input": "프롬프트 텍스트",
   "model": "erato",
   "parameters": {
-    "max_length": 2048,
+    "max_length": 150,
     "min_length": 1,
     "temperature": 1.0,
     "top_p": 0.9,
     "top_k": 0,
     "tail_free_sampling": 0,
     "repetition_penalty": 1.0,
-    "mirostat": 0
+    "repetition_penalty_range": 2048,
+    "repetition_penalty_slope": 0,
+    "repetition_penalty_frequency": 0,
+    "repetition_penalty_presence": 0,
+    "order": [0, 1, 2, 3]
   }
 }
 ```
@@ -131,15 +141,19 @@ Authorization: Bearer ${NOVELAI_API_KEY}
 | 파라미터 | 타입 | 필수 여부 | 기본값 | 설명 |
 |---------|------|----------|--------|------|
 | `input` | string | **필수** | - | 생성의 시작점이 되는 프롬프트 텍스트. 모델이 이 텍스트를 이어서 작성합니다. |
-| `model` | string | **필수** | - | 사용할 모델명. 반드시 `"erato"`로 설정해야 합니다. |
-| `parameters.max_length` | integer | 선택 | 2048 | 생성할 최대 토큰 수. 범위: 1~8192. 토큰은 대략 한글 1~2자, 영문 1단어에 해당합니다. |
+| `model` | string | **필수** | - | 사용할 모델명. `"erato"` 또는 `"Erato"`로 설정합니다. |
+| `parameters.max_length` | integer | 선택 | 150 | 생성할 최대 토큰 수. **실제 제한: 150-170 토큰**. 범위: 1~8192 (하지만 실제로는 150 초과 시 150으로 제한됨). 토큰은 대략 한글 1~2자, 영문 1단어에 해당합니다. |
 | `parameters.min_length` | integer | 선택 | 1 | 생성할 최소 토큰 수. 일반적으로 1로 설정합니다. |
 | `parameters.temperature` | float | 선택 | 1.0 | 생성의 무작위성을 제어합니다. 높을수록 창의적/다양하지만 일관성이 떨어질 수 있습니다. 범위: 0.1~2.0. 권장값: 0.7~1.2 |
-| `parameters.top_p` | float | 선택 | 0.9 | 누적 확률 샘플링. 상위 p% 확률의 토큰만 고려합니다. 범위: 0.0~1.0. 권장값: 0.85~0.95 |
+| `parameters.top_p` | float | 선택 | 0.9 | 누적 확률 샘플링 (Nucleus Sampling). 상위 p% 확률의 토큰만 고려합니다. 범위: 0.0~1.0. 권장값: 0.85~0.95 |
 | `parameters.top_k` | integer | 선택 | 0 | 상위 k개의 토큰만 고려합니다. 0이면 비활성화됩니다. 범위: 0~100 |
-| `parameters.tail_free_sampling` | float | 선택 | 0 | 꼬리 자유 샘플링. 확률 분포의 꼬리를 잘라냅니다. 범위: 0.0~1.0. 일반적으로 0으로 설정 |
+| `parameters.tail_free_sampling` | float | 선택 | 0 | 꼬리 자유 샘플링 (TFS). 확률 분포의 꼬리를 잘라냅니다. 범위: 0.0~1.0. 일반적으로 0으로 설정 |
 | `parameters.repetition_penalty` | float | 선택 | 1.0 | 반복 억제 페널티. 1.0보다 크면 이미 나온 토큰의 재사용을 억제합니다. 범위: 1.0~1.5. 권장값: 1.0~1.1 |
-| `parameters.mirostat` | integer | 선택 | 0 | Mirostat 샘플링 모드. 0=비활성화, 1=Mirostat v1, 2=Mirostat v2. 일반적으로 0으로 설정 |
+| `parameters.repetition_penalty_range` | integer | 선택 | 2048 | 반복 페널티를 적용할 토큰 범위. 최근 N개 토큰에만 페널티 적용. |
+| `parameters.repetition_penalty_slope` | float | 선택 | 0 | 반복 페널티의 기울기. 거리에 따른 페널티 변화율을 제어합니다. |
+| `parameters.repetition_penalty_frequency` | float | 선택 | 0 | 빈도 기반 반복 페널티. 토큰 출현 빈도에 따라 페널티 부여. |
+| `parameters.repetition_penalty_presence` | float | 선택 | 0 | 존재 기반 반복 페널티. 토큰의 존재 여부에 따라 페널티 부여. |
+| `parameters.order` | array | 선택 | [0,1,2,3] | 샘플링 순서. 0=temperature, 1=top_k, 2=top_p, 3=tail_free_sampling |
 
 #### 4.4. 응답 구조
 
@@ -226,14 +240,18 @@ const response = await fetch(naiUrl, {
     input: prompt,
     model: process.env.NOVELAI_MODEL || 'erato',
     parameters: {
-      max_length: parseInt(process.env.NOVELAI_MAX_LENGTH || '2048', 10),
+      max_length: parseInt(process.env.NOVELAI_MAX_LENGTH || '150', 10),
       min_length: 1,
       temperature: 1.0,
       top_p: 0.9,
       top_k: 0,
       tail_free_sampling: 0,
       repetition_penalty: 1.0,
-      mirostat: 0
+      repetition_penalty_range: 2048,
+      repetition_penalty_slope: 0,
+      repetition_penalty_frequency: 0,
+      repetition_penalty_presence: 0,
+      order: [0, 1, 2, 3]
     }
   })
 });
@@ -246,7 +264,7 @@ Vercel 대시보드에서 다음 환경 변수를 설정해야 합니다:
 ```bash
 NOVELAI_API_KEY=nai-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 NOVELAI_MODEL=erato
-NOVELAI_MAX_LENGTH=2048
+NOVELAI_MAX_LENGTH=150
 ```
 
 #### 4.7. 사용 예시
@@ -259,7 +277,7 @@ NOVELAI_MAX_LENGTH=2048
   "input": "어느 조용한 마을에 소녀가 살고 있었다.",
   "model": "erato",
   "parameters": {
-    "max_length": 512,
+    "max_length": 150,
     "temperature": 1.0,
     "top_p": 0.9
   }
@@ -281,7 +299,7 @@ NOVELAI_MAX_LENGTH=2048
   "input": "【等場人物】\n主人公: 田中太郎, 高校生, 内気な性格\n\n【要件】\n田中太郎が初めて告白するシーンを書いてください。",
   "model": "erato",
   "parameters": {
-    "max_length": 2048,
+    "max_length": 150,
     "temperature": 1.0,
     "top_p": 0.9,
     "repetition_penalty": 1.0
@@ -300,9 +318,14 @@ NOVELAI_MAX_LENGTH=2048
 
 1. **API 키 보안**: `NOVELAI_API_KEY`는 절대 프론트엔드 코드나 공개 저장소에 노출하지 마세요.
 2. **재시도 로직**: 429 오류 발생 시 지수 백오프(1s → 2s → 4s)로 재시도합니다.
-3. **토큰 계산**: `max_length`는 토큰 단위입니다. 한글 기준 대략 1토큰 = 1~2자입니다.
+3. **토큰 계산**: `max_length`는 토큰 단위입니다. **Erato의 실제 제한은 150-170 토큰**입니다.
+   - 한글 기준: 약 150-300자 정도
+   - 영문 기준: 약 100-150 단어 정도
+   - 일본어 기준: 약 200-400자 정도
 4. **프롬프트 설계**: 명확하고 구체적인 지시사항을 포함하면 더 나은 결과를 얻을 수 있습니다.
 5. **모델 업데이트**: NovelAI가 새로운 모델을 출시하면 `NOVELAI_MODEL` 환경 변수를 업데이트하세요.
+6. **구독 필요**: Erato는 **Opus 티어 구독**이 필요합니다. 구독이 없으면 "Not eligible for this model" 오류가 발생합니다.
+7. **토큰 크기**: Erato는 4바이트 토큰을 사용합니다 (이전 모델의 2바이트와 다름). 직접 디코딩 시 주의하세요.
 
 #### 4.9. 트러블슈팅
 
@@ -310,6 +333,9 @@ NOVELAI_MAX_LENGTH=2048
 |------|------|----------|
 | 401 Unauthorized | API 키 오류 | Vercel 환경 변수에서 `NOVELAI_API_KEY` 확인 |
 | 429 Too Many Requests | 요청 한도 초과 | 재시도 로직이 자동 작동. 잠시 후 다시 시도 |
-| 응답 없음 | 잘못된 모델명 | `model` 필드가 정확히 `"erato"`인지 확인 |
-| 짧은 응답 | max_length 너무 작음 | `NOVELAI_MAX_LENGTH`를 증가 (권장: 2048~4096) |
+| "Not eligible for this model" | Opus 구독 필요 | NovelAI Opus 티어 구독 확인 |
+| 응답 없음 | 잘못된 모델명 | `model` 필드가 정확히 `"erato"` 또는 `"Erato"`인지 확인 |
+| 짧은 응답 (150 토큰 미만) | max_length 너무 작음 | `NOVELAI_MAX_LENGTH`를 증가 (최대 150 권장) |
 | 반복적인 텍스트 | repetition_penalty 너무 낮음 | `repetition_penalty`를 1.05~1.1로 조정 |
+| 응답이 정확히 150 토큰에서 끊김 | 모델의 출력 제한 | 정상 동작. 여러 번 호출하여 이어쓰기 필요 |
+| 이상한 문자 출력 (디코딩 시) | 잘못된 토큰 크기 | Erato는 4바이트 토큰 사용. 디코딩 설정 확인 |

@@ -73,8 +73,9 @@ function buildPrompt(stage, userText, resourceText = "") {
       case 'SKETCH':
         return `${resourceBlock}너는 웹소설 기획 보조야. 아래 리소스와 요구사항을 바탕으로 갈등→전환→후폭풍 3단 구조로 정리해줘.\n요구사항:\n${userText}`;
       case 'J_DRAFT':
-        // [수정] Max 2048자 -> Max 8192 토큰 (API 제약사항 변경 반영)
-        return `以下のリソースと要件に従って、日本語でウェブ小説の本文を執筆してください。\n\n${resourceBlock}【必須要件】\n- 文字数: 最大 8192 トークン\n- 改行: 必ず \\n を使用\n- 文体: 会話中心, SFXは地の文 (例: 【SFX】～～)\n- 固有名詞・口調: リソースに基づき一貫性を保つ\n\n【要件】\n${userText}\n\n【禁止事項】\n- リソースと矛盾する内容`;
+        // [수정] Erato 실제 제한: 150 토큰 (최대 170 토큰)
+        // 한글 기준: 약 150-300자 정도 생성 가능
+        return `以下のリソースと要件に従って、日本語でウェブ小説の本文を執筆してください。\n\n${resourceBlock}【必須要件】\n- 最大出力: 約150トークン (約300文字程度)\n- 改行: 必ず \\n を使用\n- 文体: 会話中心, SFXは地の文 (例: 【SFX】～～)\n- 固有名詞・口調: リソースに基づき一貫性を保つ\n\n【要件】\n${userText}\n\n【禁止事項】\n- リソースと矛盾する内容`;
       case 'J_POLISH':
         return `${resourceBlock}다음 리소스를 참고하여, 아래의 일본어 웹소설 본문을 추고(推敲)해주세요.\n【추고(推敲)의 방침】\n- 리소스와 일관성 유지\n- 의미는 바꾸지 않는다\n- 불필요한 표현 삭제\n- 문장의 리듬 개선\n\n【본문】\n${userText}`;
       case 'TRANSLATE_KO':
@@ -182,8 +183,8 @@ export function initNovelView(container, novelId, epNum) {
                 <div>
                     <select id="pipelineStage" style="margin-right:8px;">
                         <option value="SKETCH">기획 (Flash-lite)</option>
-                        <option value="J_DRAFT">본작성 (NAI/일본어/Max 8192)</option>
-                        <option value="J_POLISH">다듬기 (NAI/일본어)</option>
+                        <option value="J_DRAFT">본작성 (NAI Erato/일본어/Max 150토큰≈300자)</option>
+                        <option value="J_POLISH">다듬기 (NAI Erato/일본어)</option>
                         <option value="TRANSLATE_KO">번역 (Gemini 2.5 Pro/일→한)</option>
                     </select>
                     <button id="generateSceneButton">✨ 실행</button>
