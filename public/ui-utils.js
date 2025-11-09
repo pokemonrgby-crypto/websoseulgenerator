@@ -75,10 +75,14 @@ export function showToast(message, type = 'info', duration = 3000) {
   setTimeout(() => {
     toast.style.animation = 'slideOut 0.3s ease-out';
     setTimeout(() => {
-      container.removeChild(toast);
+      if (container.contains(toast)) {
+          container.removeChild(toast);
+      }
       // 컨테이너가 비어있으면 제거
       if (container.children.length === 0) {
-        document.body.removeChild(container);
+        if (document.body.contains(container)) {
+            document.body.removeChild(container);
+        }
       }
     }, 300);
   }, duration);
@@ -101,7 +105,7 @@ export function showModal(options) {
     closeOnBackdrop = false
   } = options;
 
-  // 현재 최상위 z-index 찾기
+  // 현재 최상위 z-index 찾기 (규칙 #3: z-order 관리)
   const modals = document.querySelectorAll('.modal-overlay');
   let maxZIndex = 9000;
   modals.forEach(modal => {
@@ -175,6 +179,16 @@ export function showModal(options) {
     justify-content: flex-end;
   `;
 
+  // 모달 닫기 함수
+  function closeModal() {
+    overlay.style.animation = 'fadeIn 0.2s ease-out reverse';
+    setTimeout(() => {
+      if (document.body.contains(overlay)) {
+          document.body.removeChild(overlay);
+      }
+    }, 200);
+  }
+
   buttons.forEach(btn => {
     const button = document.createElement('button');
     button.textContent = btn.text;
@@ -222,13 +236,6 @@ export function showModal(options) {
     };
   }
 
-  function closeModal() {
-    overlay.style.animation = 'fadeIn 0.2s ease-out reverse';
-    setTimeout(() => {
-      document.body.removeChild(overlay);
-    }, 200);
-  }
-
   return {
     close: closeModal,
     element: overlay
@@ -253,7 +260,7 @@ export function confirmModal(message, onConfirm, onCancel = null) {
 }
 
 /**
- * 버튼 로딩 상태 토글
+ * 버튼 로딩 상태 토글 (규칙 #3: 버튼 비활성화)
  * @param {HTMLButtonElement} button - 버튼 엘리먼트
  * @param {boolean} loading - 로딩 상태
  * @param {string} loadingText - 로딩 중 텍스트 (기본: '처리 중...')
@@ -264,8 +271,11 @@ export function toggleButtonLoading(button, loading, loadingText = '처리 중..
     button.textContent = loadingText;
     button.disabled = true;
   } else {
-    button.textContent = button.dataset.originalText || button.textContent;
-    button.disabled = false;
-    delete button.dataset.originalText;
+    // 버튼이 DOM에서 제거되었을 수 있음
+    if (button) {
+        button.textContent = button.dataset.originalText || button.textContent;
+        button.disabled = false;
+        delete button.dataset.originalText;
+    }
   }
 }
