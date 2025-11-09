@@ -82,7 +82,6 @@ export default async function handler(req, res) {
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
         { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
         { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        // [수정] "DANGSROUS" -> "DANGEROUS" (이전 수정 반영)
         { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
       ];
 
@@ -98,7 +97,6 @@ export default async function handler(req, res) {
 
       if (!gRes.ok) {
         const errorText = await gRes.text();
-        // [개선] 에러를 JSON으로 파싱하여 클라이언트에 더 나은 정보 제공
         try {
             const errorJson = JSON.parse(errorText);
             throw new Error(errorJson.error?.message || errorText);
@@ -116,7 +114,6 @@ export default async function handler(req, res) {
       }
 
     } else if (model === 'novelai') {
-      // (NovelAI 로직은 이전과 동일)
       const novelaiApiKey = process.env.NOVELAI_API_KEY;
       if (!novelaiApiKey) {
         return res.status(500).json({ error: '서버 설정 오류: NovelAI API 키가 없습니다.' });
@@ -132,14 +129,16 @@ export default async function handler(req, res) {
           input: prompt,
           model: NAI_LATEST_MODEL,
           parameters: { 
-            temperature: 1.0, 
-            max_length: NAI_MAX_LENGTH // 2048로 수정된 값이 적용됨
+            temperature: 1.0,
+            // [신규] min_length를 명시적으로 1로 설정하여 400 오류 해결
+            min_length: 1, 
+            max_length: NAI_MAX_LENGTH
           }
         })
       });
       if (!nRes.ok) {
         const t = await nRes.text();
-        throw new Error(`NovelAI 호출 실패: ${t}`); // 사용자가 본 오류가 여기서 발생
+        throw new Error(`NovelAI 호출 실패: ${t}`);
       }
       const nData = await nRes.json();
       resultText = nData.output || '(NovelAI 응답 없음)';
@@ -153,7 +152,6 @@ export default async function handler(req, res) {
 
   } catch (err) {
     console.error('Proxy 오류:', err);
-    // [개선] err.message를 details로 전송
     return res.status(500).json({ error: '서버에서 오류가 발생했습니다.', details: err.message });
   }
 }
