@@ -10,9 +10,10 @@ const ALLOWED_MODELS = new Set([
 ]);
 
 // NovelAI 최신/최상 모델 설정 (규칙 #0: 인터넷 검색 결과 반영)
-// 2025-10-01 릴리즈된 GLM-4.6을 기본으로 사용
-const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'glm-4.6'; 
-const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '4000', 10);
+// [수정] 'glm-4.6'은 유효하지 않은 enum으로 확인됨. 'kayra-v1'로 롤백.
+const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'kayra-v1'; 
+// [수정] API가 최대 2048을 초과하는 max_length를 거부함. (기존 4000)
+const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '2048', 10);
 
 // (fetchWithRetry 함수는 이전과 동일)
 async function fetchWithRetry(url, options, maxRetries = 3) {
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
         { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
         { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        // [수정] "DANGSROUS" -> "DANGEROUS"
+        // [수정] "DANGSROUS" -> "DANGEROUS" (이전 수정 반영)
         { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
       ];
 
@@ -132,13 +133,13 @@ export default async function handler(req, res) {
           model: NAI_LATEST_MODEL,
           parameters: { 
             temperature: 1.0, 
-            max_length: NAI_MAX_LENGTH
+            max_length: NAI_MAX_LENGTH // 2048로 수정된 값이 적용됨
           }
         })
       });
       if (!nRes.ok) {
         const t = await nRes.text();
-        throw new Error(`NovelAI 호출 실패: ${t}`);
+        throw new Error(`NovelAI 호출 실패: ${t}`); // 사용자가 본 오류가 여기서 발생
       }
       const nData = await nRes.json();
       resultText = nData.output || '(NovelAI 응답 없음)';
