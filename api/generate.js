@@ -9,8 +9,9 @@ const ALLOWED_MODELS = new Set([
   'novelai'
 ]);
 
-// NovelAI 최신/최상 모델 설정 (환경변수로 관리)
-const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'kayra-v1';
+// NovelAI 최신/최상 모델 설정 (규칙 #0: 인터넷 검색 결과 반영)
+// 2025-10-01 릴리즈된 GLM-4.6을 기본으로 사용
+const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'glm-4.6'; 
 const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '4000', 10);
 
 // 지수 백오프 재시도 함수
@@ -84,7 +85,7 @@ export default async function handler(req, res) {
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
         { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
         { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
+        { category: 'HARM_CATEGORY_DANGSROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' }
       ];
 
       const gRes = await fetchWithRetry(geminiUrl, {
