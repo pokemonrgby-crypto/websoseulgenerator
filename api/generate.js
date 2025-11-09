@@ -9,10 +9,9 @@ const ALLOWED_MODELS = new Set([
   'novelai'
 ]);
 
-// NovelAI: ERATO(Opus) 기본값
-const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'erato';
-// OpenAI 호환 스펙에서는 max_tokens 사용
-const NAI_MAX_TOKENS = parseInt(process.env.NOVELAI_MAX_TOKENS || '1024', 10);
+// NovelAI: ERATO(텍스트 API) 기본값
+const NAI_TEXT_MODEL = process.env.NOVELAI_TEXT_MODEL || 'erato'; // Opus 전용
+const NAI_TEXT_MAX_LENGTH = parseInt(process.env.NOVELAI_TEXT_MAX_LENGTH || '1024', 10);
 
 // (fetchWithRetry 함수는 이전과 동일)
 async function fetchWithRetry(url, options, maxRetries = 3) {
@@ -120,8 +119,25 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: '서버 설정 오류: NovelAI API 키가 없습니다.' });
       }
 
-      // OpenAI 호환 엔드포인트 (ERATO 대응)
-      const naiUrl = 'https://text.novelai.net/oa/v1/chat/completions';
+      // NovelAI 텍스트 API(비-OA) — ERATO 호출
+      const naiUrl = 'https://api.novelai.net/ai/generate';
+
+      const body = {
+        input: prompt,
+        model: NAI_TEXT_MODEL, // 기본 'erato' (Opus 전용)
+        parameters: {
+          temperature: 0.9,
+          max_length: NAI_TEXT_MAX_LENGTH,
+          min_length: 1,
+          top_k: 0,
+          top_p: 0.85,
+          tail_free_sampling: 0.92,
+          repetition_penalty: 1.1,
+          repetition_penalty_range: 2048,
+          // stop_sequences: ['\n\n'],
+          use_string: true
+        }
+      };
 
       const nRes = await fetchWithRetry(naiUrl, {
         method: 'POST',
@@ -129,39 +145,26 @@ export default async function handler(req, res) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${novelaiApiKey}`
         },
-        body: JSON.stringify({
-          model: NAI_LATEST_MODEL, // 'erato' (Opus 전용)
-          messages: [
-            {
-              role: 'system',
-              content: 'You are Erato, a powerful storytelling model on NovelAI. Keep outputs coherent and long-form.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.9,
-          max_tokens: NAI_MAX_TOKENS
-          // 필요 시 stop 추가 가능: stop: ['\n\n']
-        })
+        body: JSON.stringify(body)
       });
 
       if (!nRes.ok) {
         const t = await nRes.text();
         try {
           const errorJson = JSON.parse(t);
-          throw new Error(`NovelAI 호출 실패 (${nRes.status}): ${errorJson.message || t}`);
-        } catch (e) {
-          throw new Error(`NovelAI 호출 실패 (${nRes.status}): ${t}`);
+          throw new Error(`NovelAI(ERATO) 호출 실패 (${nRes.status}): ${errorJson.message || t}`);
+        } catch {
+          throw new Error(`NovelAI(ERATO) 호출 실패 (${nRes.status}): ${t}`);
         }
       }
-      const nData = await nRes.json();
 
-      if (nData.choices && nData.choices[0]?.message?.content) {
-        resultText = nData.choices[0].message.content;
+      const nData = await nRes.json();
+      if (typeof nData.output === 'string' && nData.output.length > 0) {
+        resultText = nData.output;
+      } else if (Array.isArray(nData.choices) && nData.choices[0]?.text) {
+        resultText = nData.choices[0].text;
       } else {
-        resultText = '(NovelAI 응답 없음)';
+        resultText = '(NovelAI(ERATO) 응답 없음)';
       }
 
     } else {
