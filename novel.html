@@ -1,26 +1,34 @@
-<!-- /novel.html -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>집필실 (V6.2)</title>
+  <title>집필실 (V6.2 - 리소스 주입)</title>
   <style>
     body { font-family:-apple-system,sans-serif; background:#f0f2f5; }
     .editor-layout{ display:grid; grid-template-columns: 1fr 360px; gap:20px; padding:20px; max-width:1600px; margin:0 auto; height:calc(100vh - 40px); }
     .main-content{ background:#fff; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:12px; }
-    .side{ background:#fff; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px; }
+    .side{ background:#fff; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:16px; overflow-y: auto; }
     h2 { margin:0 0 4px 0; }
-    textarea, input { width:100%; border:1px solid #ddd; border-radius:8px; padding:10px; font-family:inherit; }
+    textarea, input { width:100%; border:1px solid #ddd; border-radius:8px; padding:10px; font-family:inherit; box-sizing: border-box; }
     button { background:#007aff; color:#fff; border:0; padding:8px 12px; border-radius:8px; cursor:pointer; }
+    button:disabled { background: #999; }
     button.sub-ai { background:#6c757d; }
+    button.resource { background: #e6f7ff; color: #0056b3; border: 1px solid #b3e0ff; }
     pre { white-space:pre-wrap; word-break:break-word; }
     .blocks p { margin:8px 0; line-height:1.6; }
+
+    /* 리소스 주입기 스타일 */
+    #resource-injector { border:1px solid #ddd; border-radius:12px; padding:12px; }
+    #resource-injector legend { font-weight: bold; }
+    .resource-list { max-height: 200px; overflow-y: auto; padding: 5px; background: #f9f9f9; border-radius: 6px; }
+    .resource-list label { display: block; padding: 4px; border-radius: 4px; cursor: pointer; }
+    .resource-list label:hover { background: #eee; }
+    .resource-list input { margin-right: 8px; }
   </style>
 </head>
 <body>
 
-<!-- [KEYBAR START] -->
 <div id="keybar" style="position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #eee;padding:10px 12px;margin:-20px -20px 10px -20px;display:flex;gap:8px;align-items:center;">
   <strong>🔑 경비실 키</strong>
   <input id="secretKeyInput" placeholder="MY_SECRET_KEY" style="flex:1;max-width:360px;padding:8px;border:1px solid #ddd;border-radius:8px;">
@@ -38,8 +46,6 @@
   $('deleteSecretKeyButton').onclick=()=>{ localStorage.removeItem('MY_SECRET_KEY'); input.value=''; status.textContent='미저장'; alert('키 삭제 완료!'); };
 })();
 </script>
-<!-- [KEYBAR END] -->
-
 <div class="editor-layout">
   <div class="main-content">
     <h2 id="episodeTitle">집필</h2>
@@ -55,23 +61,26 @@
       </select>
       <button id="generateSceneButton">✨ 실행</button>
       <button id="copyJapaneseButton" class="sub-ai" style="margin-left:8px;">🧷 원문(일본어) 복사</button>
+      <button id="saveContentButton" class="sub-ai" style="margin-left:8px;">💾 본문 저장</button>
     </div>
 
-    <div class="blocks" id="novel-blocks"></div>
+    <div class="blocks" id="novel-blocks" style="flex: 1; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px;"></div>
     <pre id="sceneResult" style="background:#f6f6f6;padding:8px;border-radius:8px;"></pre>
   </div>
 
   <div class="side">
-    <fieldset style="border:1px solid #ddd;border-radius:12px;padding:12px;">
-      <legend>회차 데이터(참고/수정)</legend>
-      <label>변경 전(참고)</label>
-      <textarea id="dbBefore" rows="4" readonly>{"name":"A","status":"팔 있음"}</textarea>
-      <label>변경 후(저장 대상)</label>
-      <textarea id="dbAfter" rows="4">{"name":"A","status":"팔 없음"}</textarea>
-      <div style="margin-top:8px;display:flex;gap:8px;">
-        <button id="saveEpisodeDbButton" class="sub-ai">회차 DB 저장</button>
-        <button id="saveContentButton" class="sub-ai">본문 저장</button>
-      </div>
+    <fieldset id="resource-injector">
+      <legend>리소스 주입</legend>
+      <button id="editResourcesButton" class="resource" style="width: 100%; margin-bottom: 12px;">📚 리소스 관리 페이지로 이동</button>
+      
+      <strong>등장인물</strong>
+      <div id="characters-list" class="resource-list"></div>
+      <br>
+      <strong>배경/장소</strong>
+      <div id="places-list" class="resource-list"></div>
+      <br>
+      <strong>고유 용어</strong>
+      <div id="terms-list" class="resource-list"></div>
     </fieldset>
 
     <fieldset style="border:1px solid #ddd;border-radius:12px;padding:12px;">
@@ -80,10 +89,14 @@
       <button id="proxyButton" class="sub-ai">보내기</button>
       <pre id="proxyResult" style="background:#f6f6f6;padding:8px;border-radius:8px;"></pre>
     </fieldset>
-  </div>
+
+    </div>
 </div>
 
-<script>
+<script type="module">
+  // 공용 유틸리티 임포트
+  import { showToast, toggleButtonLoading } from './public/ui-utils.js';
+
   const params=new URLSearchParams(location.search);
   const novelId=params.get('id'); const episodeNum=Number(params.get('ep')||1);
   const secretKey=localStorage.getItem('MY_SECRET_KEY');
@@ -96,27 +109,80 @@
   function getNovel(){ return load().find(n=>n.id===novelId); }
   function getEpisode(n){ return (n.episodes||[]).find(e=>e.no===episodeNum); }
 
-  // 토스트 알림 함수
-  function showToast(message, type = 'info', duration = 3000) {
-    let container = document.getElementById('toast-container');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'toast-container';
-      container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:10000;display:flex;flex-direction:column;gap:10px;';
-      document.body.appendChild(container);
-    }
-    const colors = { success: '#28a745', error: '#dc3545', info: '#007aff', warning: '#ffc107' };
-    const toast = document.createElement('div');
-    toast.style.cssText = `background:${colors[type]||colors.info};color:white;padding:12px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:14px;max-width:350px;`;
-    toast.textContent = message;
-    container.appendChild(toast);
-    setTimeout(() => { container.removeChild(toast); if(container.children.length===0) document.body.removeChild(container); }, duration);
+  const novel = getNovel();
+  if (!novel) {
+      document.body.innerHTML = '<h1>소설을 찾을 수 없습니다.</h1><a href="index.html">목록으로</a>';
+      throw new Error("소설 없음");
   }
+  const episode = getEpisode(novel);
 
   // 제목 세팅
   (function initTitle(){
-    $('episodeTitle').textContent=`${novelId} - ${episodeNum}화 집필 중`;
+    $('episodeTitle').textContent=`${novel.title} - ${episodeNum}화 집필 중`;
   })();
+
+  // [신규] 리소스 관리 페이지 이동 버튼
+  $('editResourcesButton').onclick = () => location.href = `resource.html?id=${novelId}`;
+
+  // [신규] 리소스 주입기 렌더링
+  let masterResources = novel.resources || { characters: [], places: [], terms: [] };
+  // TODO: 회차 스냅샷 리소스(episode.resources)와 비교하여 UI에 표시해야 함 (규칙 #11)
+  // 현재는 마스터 리소스만 표시 (단순화)
+
+  /**
+   * 리소스 리스트 렌더링
+   * @param {string} type - 'characters', 'places', 'terms'
+   * @param {Array} data - 리소스 객체 배열
+   */
+  function renderResourceList(type, data) {
+    const listEl = $(`${type}-list`);
+    listEl.innerHTML = '';
+    if (!data || data.length === 0) {
+      listEl.innerHTML = '<span>(리소스 없음)</span>';
+      return;
+    }
+    data.forEach((item, index) => {
+      // 카드에 표시될 이름 찾기 (name, 이름, 장소명, 용어 등)
+      const displayName = item.name || item.이름 || item.장소명 || item.용어 || `항목 ${index + 1}`;
+      const label = document.createElement('label');
+      label.innerHTML = `<input type="checkbox" class="resource-check" data-type="${type}" data-index="${index}" checked> ${displayName}`;
+      listEl.appendChild(label);
+    });
+  }
+
+  (function loadResources() {
+    renderResourceList('characters', masterResources.characters);
+    renderResourceList('places', masterResources.places);
+    renderResourceList('terms', masterResources.terms);
+  })();
+
+  // [신규] 체크된 리소스 직렬화
+  function getFormattedResources() {
+    let resourceText = "";
+    const checkedItems = document.querySelectorAll('.resource-check:checked');
+    if (checkedItems.length === 0) return "";
+
+    const grouped = { characters: [], places: [], terms: [] };
+
+    checkedItems.forEach(check => {
+      const type = check.dataset.type;
+      const index = parseInt(check.dataset.index, 10);
+      grouped[type].push(masterResources[type][index]);
+    });
+
+    if (grouped.characters.length > 0) {
+      resourceText += "【등장인물】\n" + grouped.characters.map(item => JSON.stringify(item)).join('\n') + "\n\n";
+    }
+    if (grouped.places.length > 0) {
+      resourceText += "【배경/장소】\n" + grouped.places.map(item => JSON.stringify(item)).join('\n') + "\n\n";
+    }
+    if (grouped.terms.length > 0) {
+      resourceText += "【고유 용어】\n" + grouped.terms.map(item => JSON.stringify(item)).join('\n') + "\n\n";
+    }
+    
+    return resourceText.trim();
+  }
+
 
   // 파이프라인 & 모델 매핑
   let lastJapaneseDraft = "";
@@ -127,11 +193,19 @@
     TRANSLATE_KO: 'gemini-2.5-pro'     // 번역 (일→한) - Gemini 2.5 Pro
   };
 
-  function buildPrompt(stage, userText){
+  /**
+   * [수정] 프롬프트 빌더 (리소스 텍스트 추가)
+   * @param {string} stage 
+   * @param {string} userText 
+   * @param {string} resourceText 
+   */
+  function buildPrompt(stage, userText, resourceText = ""){
+    const resourceBlock = resourceText ? `【참고 리소스】\n${resourceText}\n\n` : "";
+
     switch(stage){
       case 'SKETCH':
         // 스케치: 갈등→전환→후폭풍 3단 구조 개요 생성
-        return `너는 웹소설 기획 보조야. 아래 요구사항을 갈등→전환→후폭풍 3단 구조로 정리해줘.
+        return `${resourceBlock}너는 웹소설 기획 보조야. 아래 리소스와 요구사항을 바탕으로 갈등→전환→후폭풍 3단 구조로 정리해줘.
 각 단계별로 5-8문장씩 작성하고, 다음 항목을 포함해:
 - 개요 (장면 흐름)
 - 핵심 도구/소품
@@ -142,43 +216,42 @@
 ${userText}`;
       case 'J_DRAFT':
         // 본문 초안: 일본어로 3000-4000자 웹소설 생성
-        return `以下の要件に従って、日本語でウェブ小説の本文を執筆してください。
+        return `以下のリソースと要件に従って、日本語でウェブ小説の本文を執筆してください。
 
-【必須要件】
+${resourceBlock}【必須要件】
 - 文字数: 3,000～4,000字を目標とする
-- 改行: 必ず \\n を使用 (プラットフォーム互換性)
+- 改行: 必ず \\n を使用 (プラットフォーム互換성)
 - 文体: ウェブ小説らしく会話を中心に、文ごとの改行を積極的に活用
 - 効果音(SFX): セリフの外の地の文で表記 (例: 【SFX】～～)
-- 固有名詞・口調: 一貫性を保つ
-- トーン/演出: 場面の目的を明確に、感情線/葛藤-転換-余韻の流れを維持
+- 固有名詞・口調: リソースに基づき一貫性を保つ
+- トーン/연출: 場面の目的を明確に、感情線/葛藤-転換-余韻の流れを維持
 
 【要件】
 ${userText}
 
 【禁止事項】
-- 不必要な英語の混在
-- 過度なルビの使用
+- リソースと矛盾する内容
 - サービスポリシー違反 (暴力表現・個人情報・差別表現の禁止)`;
       case 'J_POLISH':
         // 일본어 다듬기: 의미 유지하며 문장 개선
-        return `次の日本語のウェブ小説本文を推敲してください。
+        return `${resourceBlock}다음 리소스를 참고하여, 아래의 일본어 웹소설 본문을 추고(推敲)해주세요.
 
-【推敲の方針】
-- 意味は変えない
-- 冗長な表現を削除
-- 文のリズムと呼吸感を改善
-- 口調の一貫性を保つ
-- 長さは ±10% 以内で自然に調整
+【추고(推敲)의 방침】
+- 리소스와 일관성 유지 (특히 말투, 고유명사)
+- 의미는 바꾸지 않는다
+- 중복되거나 불필요한 표현 삭제
+- 문장의 리듬과 호흡 개선
+- 길이는 ±10% 내에서 자연스럽게 조정
 
-【本文】
+【본문】
 ${userText}`;
       case 'TRANSLATE_KO':
         // 번역: 일본어→한국어 자연스럽게
-        return `다음 일본어 웹소설 본문을 자연스럽고 문학적인 한국어로 번역해줘.
+        return `${resourceBlock}다음 리소스를 참고하여, 아래의 일본어 웹소설 본문을 자연스럽고 문학적인 한국어로 번역해줘.
 
 【번역 원칙】
 - 말맛/톤 유지, 과한 의역 금지
-- 일본어 고유명사는 첫 등장 시에만 (원문) 병기
+- 리소스에 명시된 고유명사/인명은 정확히 번역
 - 웹소설답게 대화와 줄바꿈 살리기
 - 효과음(SFX) 표기 유지
 
@@ -209,14 +282,20 @@ ${userText}`;
 
     const stage=($('pipelineStage')||{value:'SKETCH'}).value;
     const model=MODEL_FOR[stage];
-    const prompt=buildPrompt(stage, userText);
+    
+    // [신규] 체크된 리소스 가져오기
+    const resourceText = getFormattedResources();
+    
+    // [수정] 프롬프트 빌드
+    const prompt=buildPrompt(stage, userText, resourceText);
 
-    const old=generateBtn.textContent; generateBtn.textContent='생성 중...'; generateBtn.disabled=true;
+    toggleButtonLoading(generateBtn, true, '생성 중...');
     try{
       const data=await callProxy(model, prompt, secretKey);
       const text=data.text||'';
 
       // 본문 화면에 추가
+      // TODO: 기존 블록에 추가하는 방식 개선 필요
       const p=document.createElement('p'); p.textContent=text||' ';
       $('novel-blocks').appendChild(p);
 
@@ -229,7 +308,7 @@ ${userText}`;
       sceneResultEl.textContent=`오류: ${e.message}`;
       showToast('오류: ' + e.message, 'error');
     }finally{
-      generateBtn.disabled=false; generateBtn.textContent=old;
+      toggleButtonLoading(generateBtn, false, '✨ 실행');
     }
   });
 
@@ -244,19 +323,15 @@ ${userText}`;
   $('saveContentButton').addEventListener('click', ()=>{
     const arr=load(); const n=arr.find(x=>x.id===novelId); if(!n) return showToast('소설을 찾을 수 없습니다.', 'error');
     const ep=getEpisode(n); if(!ep) return showToast('회차를 찾을 수 없습니다.', 'error');
+    
     const blocks=[...document.querySelectorAll('#novel-blocks p')].map(p=>p.textContent);
-    ep.content = blocks.join('\n\n');
+    ep.content = blocks.join('\n\n'); // \n\n으로 문단 구분 저장
+    
     ep.updatedAt=Date.now(); n.updatedAt=Date.now(); save(arr);
     showToast('본문 저장 완료!', 'success');
-  });
-
-  // 회차 DB 저장(로컬)
-  $('saveEpisodeDbButton').addEventListener('click', ()=>{
-    const arr=load(); const n=arr.find(x=>x.id===novelId); if(!n) return showToast('소설을 찾을 수 없습니다.', 'error');
-    const ep=getEpisode(n); if(!ep) return showToast('회차를 찾을 수 없습니다.', 'error');
-    ep.episodeDB = $('dbAfter').value;
-    ep.updatedAt=Date.now(); n.updatedAt=Date.now(); save(arr);
-    showToast('회차 DB 저장 완료!', 'success');
+    
+    // TODO: 회차 저장 시 리소스 스냅샷 저장 (규칙 #13)
+    // "변화가 발생한 리소스만 회차 리소스로 스냅샷"
   });
 
   // 편의 프롬프트(Flash-lite)
@@ -265,9 +340,8 @@ ${userText}`;
   proxyBtn.addEventListener('click', async ()=>{
     const prompt=document.getElementById('proxyPrompt').value;
     if(!secretKey || !prompt) return showToast('키 또는 프롬프트가 없습니다.', 'warning');
-    proxyBtn.disabled=true;
-    const oldText = proxyBtn.textContent;
-    proxyBtn.textContent = '전송 중...';
+    
+    toggleButtonLoading(proxyBtn, true, '전송 중...');
     try{
       const data=await callProxy('gemini-2.5-flash-lite', prompt, secretKey);
       proxyResultEl.textContent=data.text||'';
@@ -276,22 +350,20 @@ ${userText}`;
       proxyResultEl.textContent=`오류: ${e.message}`;
       showToast('오류 발생: ' + e.message, 'error');
     }finally{
-      proxyBtn.disabled=false;
-      proxyBtn.textContent = oldText;
+      toggleButtonLoading(proxyBtn, false, '보내기');
     }
   });
 
   // 기존 회차 내용 불러오기(있으면)
   (function loadEpisodeContent(){
-    const n=getNovel(); if(!n) return;
-    const ep=getEpisode(n); if(!ep) return;
-    if(ep.content){
-      ep.content.split(/\n\s*\n/).forEach(chunk=>{
-        const p=document.createElement('p'); p.textContent=chunk; $('novel-blocks').appendChild(p);
+    if(episode && episode.content){
+      // \n\n (빈 줄)을 기준으로 문단을 복원
+      episode.content.split(/\n\s*\n/).forEach(chunk=>{
+        const p=document.createElement('p'); p.textContent=chunk || ' '; // 빈 줄도 p 태그로
+        $('novel-blocks').appendChild(p);
       });
     }
-    if(ep.episodeDB){ $('dbAfter').value=ep.episodeDB; }
-    $('dbBefore').value='(참고) 여기에 마스터/이전 회차의 캐릭터 상태를 넣어도 좋아.';
+    // TODO: 회차 스냅샷(episode.resources)이 있으면 '변경 전'으로 표시
   })();
 </script>
 </body>
