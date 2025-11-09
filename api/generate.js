@@ -11,7 +11,10 @@ const ALLOWED_MODELS = new Set([
 
 // NovelAI 최신/최상 모델 설정 (규칙 #0: 인터넷 검색 결과 반영)
 const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'glm-4.6'; 
-const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '8192', 10);
+// [수정] NovelAI API의 max_length 최대 허용치는 4096입니다.
+// 8192는 'max' tag validation 오류를 발생시킵니다.
+// README.md 가이드라인(기본값 4000)을 따릅니다.
+const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '4000', 10);
 
 // (fetchWithRetry 함수는 이전과 동일)
 async function fetchWithRetry(url, options, maxRetries = 3) {
@@ -134,7 +137,7 @@ export default async function handler(req, res) {
           parameters: { 
             temperature: 1.0,
             min_length: 1, 
-            max_length: NAI_MAX_LENGTH // 8192
+            max_length: NAI_MAX_LENGTH // [수정] 8192 -> 4000
           }
         })
       });
