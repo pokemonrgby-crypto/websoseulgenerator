@@ -11,9 +11,8 @@ const ALLOWED_MODELS = new Set([
 
 // NovelAI 최신/최상 모델 설정 (규칙 #0: 인터넷 검색 결과 반영)
 const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'glm-4.6'; 
-// [수정] NovelAI API의 max_length 최대 허용치는 4096입니다.
-// 8192는 'max' tag validation 오류를 발생시킵니다.
-// README.md 가이드라인(기본값 4000)을 따릅니다.
+// [수정] Vercel 환경 변수(NOVELAI_MAX_LENGTH)를 우선으로 하되, 
+// 코드를 직접 배포할 경우의 기본값도 4000으로 설정합니다. (API 최대 4096)
 const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '4000', 10);
 
 // (fetchWithRetry 함수는 이전과 동일)
@@ -107,7 +106,7 @@ export default async function handler(req, res) {
             throw new Error(`Gemini(${modelName}) 호출 실패: ${errorText}`);
         }
       }
-      const data = await gRes.json();
+      const data = await gGres.json();
       if (data.candidates && data.candidates[0]?.content?.parts) {
         resultText = data.candidates[0].content.parts.map(p => p.text || '').join('');
       } else if (data.candidates && data.candidates[0]?.finishReason === 'SAFETY') {
@@ -137,7 +136,7 @@ export default async function handler(req, res) {
           parameters: { 
             temperature: 1.0,
             min_length: 1, 
-            max_length: NAI_MAX_LENGTH // [수정] 8192 -> 4000
+            max_length: NAI_MAX_LENGTH // 4000 (Vercel 변수 우선)
           }
         })
       });
