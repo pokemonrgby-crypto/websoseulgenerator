@@ -1,196 +1,213 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>내 소설 목록 (V6 - 모달/리소스 적용)</title>
-  <style>
-    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; padding:30px; }
-    h1 { text-align:center; color:#333; }
-    .topbar { display:flex; justify-content:center; margin:12px 0 24px; gap:8px; }
-    .grid { max-width:1000px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
-    .card { background:#fff; border-radius:12px; padding:16px; border:1px solid #e7e7e7; display:flex; flex-direction:column; gap:8px; }
-    .card h3 { margin:0; font-size:16px; color:#222; }
-    .meta { color:#666; font-size:12px; }
-    .row { display:flex; gap:8px; }
-    button { background:#007aff; color:#fff; border:0; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight: 500; }
-    button.primary { background:#007aff; }
-    button.secondary { background:#fff; color:#333; border:1px solid #ddd; }
-    button.danger { background: #ffebeb; color: #dc3545; border: 1px solid #ffc2c2; }
-    button.resource { background: #e6f7ff; color: #0056b3; border: 1px solid #b3e0ff; }
-    input, textarea { border:1px solid #ddd; border-radius:8px; padding:8px; width:100%; box-sizing: border-box; }
-    /* sticky keybar 배경 보정 */
-    .wrap { max-width:1000px; margin:0 auto; }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>웹소설 생성기 (SPA-V7)</title>
+    <style>
+        /* [신규] 다크 모드 "게임 UI" 테마 CSS */
+        :root {
+            --bg-dark-1: #1a1c20;
+            --bg-dark-2: #25282e;
+            --bg-dark-3: #2c3038;
+            --border-color: #444;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --accent-blue: #007aff;
+            --accent-green: #28a745;
+            --accent-red: #dc3545;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background: var(--bg-dark-1);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+        }
+
+        /* --- 셸 레이아웃 --- */
+        #keybar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: var(--bg-dark-2);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px 20px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        #app-container {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* --- 공용 컴포넌트 (높은 가독성) --- */
+        h1, h2, h3 { color: var(--text-primary); margin: 0 0 16px 0; font-weight: 600; }
+        
+        button {
+            background: var(--accent-blue);
+            color: #fff;
+            border: 0;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #555; color: #999; cursor: not-allowed; }
+
+        button.sub, button.secondary {
+            background: var(--bg-dark-3);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        button.sub:hover, button.secondary:hover { background: #3a3f48; }
+
+        button.danger {
+            background: #4a272c;
+            color: #ffc2c2;
+            border: 1px solid #dc3545;
+        }
+        button.danger:hover { background: #6b2f38; }
+
+        button.resource {
+            background: #1f3a52;
+            color: #b3e0ff;
+            border: 1px solid #0056b3;
+        }
+        button.resource:hover { background: #2f5a80; }
+
+        button.save { background: var(--accent-green); }
+        button.save:hover { background: #1e7e34; }
+
+        input, textarea, select {
+            background: var(--bg-dark-1);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            font-family: var(--font-family);
+            font-size: 14px;
+        }
+        input:focus, textarea:focus {
+            border-color: var(--accent-blue);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.5);
+        }
+
+        pre {
+            background: var(--bg-dark-2);
+            padding: 12px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: var(--text-secondary);
+        }
+
+        /* --- 뷰별 컨테이너 --- */
+        .card {
+            background: var(--bg-dark-2);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+        .meta { color: var(--text-secondary); font-size: 12px; }
+        .row { display: flex; gap: 8px; }
+
+        /* 집필실 (novel) */
+        .editor-layout {
+            display: grid;
+            grid-template-columns: 1fr 360px;
+            gap: 20px;
+            height: calc(100vh - 120px); /* 100vh - keybar - padding */
+        }
+        .main-content {
+            background: var(--bg-dark-2); border-radius: 12px; padding: 20px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .side {
+            background: var(--bg-dark-2); border-radius: 12px; padding: 20px;
+            display: flex; flex-direction: column; gap: 16px; overflow-y: auto;
+        }
+        .blocks {
+            flex: 1; overflow-y: auto; border: 1px solid var(--border-color);
+            padding: 10px; border-radius: 8px;
+        }
+        .blocks p { margin: 8px 0; line-height: 1.6; }
+
+        /* 리소스 (resource) */
+        .tab-nav { display: flex; gap: 4px; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; }
+        .tab-nav button { background: var(--bg-dark-2); border-bottom: 0; border-radius: 8px 8px 0 0; }
+        .tab-nav button.active {
+            background: var(--bg-dark-1);
+            border: 2px solid var(--border-color);
+            border-bottom: 2px solid var(--bg-dark-1);
+            font-weight: bold;
+            transform: translateY(2px);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .resource-card {
+            background: var(--bg-dark-3);
+            border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 12px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .field { display: flex; gap: 4px; align-items: center; }
+        .field input.key { flex: 1; }
+        .field input.value { flex: 2; }
+        .field button.del-field {
+            background: #4a272c; color: #ffc2c2; border: 1px solid #dc3545;
+            padding: 0 8px; font-size: 14px; border-radius: 4px;
+            height: 30px;
+        }
+        .card-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .card-actions button { font-size: 12px; padding: 6px 10px; }
+    </style>
 </head>
 <body>
 
-<div id="keybar" style="position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #eee;padding:10px 12px;margin:-30px -30px 20px -30px;display:flex;gap:8px;align-items:center;">
-  <strong>🔑 경비실 키</strong>
-  <input id="secretKeyInput" placeholder="MY_SECRET_KEY" style="flex:1;max-width:360px;padding:8px;border:1px solid #ddd;border-radius:8px;">
-  <button id="saveSecretKeyButton" style="padding:8px 12px;border:0;border-radius:8px;background:#007aff;color:#fff;">저장</button>
-  <button id="deleteSecretKeyButton" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;">삭제</button>
-  <span id="keyStatus" style="margin-left:8px;color:#666;font-size:12px;"></span>
-</div>
-<script>
-(function(){
-  const $=id=>document.getElementById(id);
-  const input=$('secretKeyInput'), status=$('keyStatus');
-  const v=localStorage.getItem('MY_SECRET_KEY')||'';
-  input.value=v; status.textContent=v?'저장됨':'미저장';
-  $('saveSecretKeyButton').onclick=()=>{ const t=input.value.trim(); if(!t) return alert('값이 비어있어.'); localStorage.setItem('MY_SECRET_KEY',t); status.textContent='저장됨'; alert('키 저장 완료!'); };
-  $('deleteSecretKeyButton').onclick=()=>{ localStorage.removeItem('MY_SECRET_KEY'); input.value=''; status.textContent='미저장'; alert('키 삭제 완료!'); };
-})();
-</script>
-<div class="wrap">
-  <h1>내 소설</h1>
+    <div id="keybar">
+        <strong style="color: var(--text-primary);">🔑 경비실 키</strong>
+        <input id="secretKeyInput" placeholder="MY_SECRET_KEY" style="flex:1;max-width:360px;">
+        <button id="saveSecretKeyButton">저장</button>
+        <button id="deleteSecretKeyButton" class="secondary">삭제</button>
+        <span id="keyStatus" style="margin-left:8px;color:var(--text-secondary);font-size:12px;"></span>
+    </div>
+    <script>
+    (function(){
+        const $=id=>document.getElementById(id);
+        const input=$('secretKeyInput'), status=$('keyStatus');
+        const v=localStorage.getItem('MY_SECRET_KEY')||'';
+        input.value=v; status.textContent=v?'저장됨':'미저장';
+        $('saveSecretKeyButton').onclick=()=>{ const t=input.value.trim(); if(!t) return alert('값이 비어있어.'); localStorage.setItem('MY_SECRET_KEY',t); status.textContent='저장됨'; /* ui-utils 로드 전이므로 alert 사용 */ };
+        $('deleteSecretKeyButton').onclick=()=>{ localStorage.removeItem('MY_SECRET_KEY'); input.value=''; status.textContent='미저장'; alert('키 삭제 완료!'); };
+    })();
+    </script>
+    <div id="app-container">
+        <h1>로딩 중...</h1>
+    </div>
 
-  <div class="topbar">
-    <button id="addNovelButton">➕ 새 소설 만들기</button>
-  </div>
-
-  <div id="list" class="grid"></div>
-</div>
-
-<script type="module">
-  // 공용 유틸리티 임포트
-  import { showModal, showToast } from './public/ui-utils.js';
-
-  const LS_KEY='novels';
-  const $=sel=>document.querySelector(sel);
-  function loadNovels(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch{ return []; } }
-  function saveNovels(arr){ localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
-  
-  // (index.html 내장 버전 대신 ui-utils.js 사용)
-  
-  function render(){
-    const listEl=$('#list'); listEl.innerHTML='';
-    const arr=loadNovels();
-    if(!arr.length){ listEl.innerHTML='<div class="card"><h3>아직 작품이 없어</h3><div class="meta">상단에서 “새 소설 만들기”를 눌러 시작하자.</div></div>'; return; }
-    
-    arr.sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)); // 최신순 정렬
-
-    arr.forEach(n=>{
-      const div=document.createElement('div'); div.className='card';
-      const episodeCount = n.episodes?.length || 0;
-      const lastEpisode = episodeCount > 0 ? n.episodes[episodeCount - 1] : null;
-
-      div.innerHTML = `
-        <h3>${n.title}</h3>
-        <div class="meta">ID: ${n.id}</div>
-        <div class="meta">회차: ${episodeCount} · 업데이트: ${new Date(n.updatedAt||n.createdAt).toLocaleString()}</div>
-        <div class="row">
-          <button class="open" data-id="${n.id}" data-ep="${lastEpisode ? lastEpisode.no : 1}">🚀 집필</button>
-          <button class="resources" data-id="${n.id}">📚 리소스</button>
-          <button class="secondary del" data-id="${n.id}">삭제</button>
-        </div>`;
-      
-      listEl.appendChild(div);
-    });
-
-    // 이벤트 위임 (동적 생성된 버튼에 이벤트 할당)
-    listEl.addEventListener('click', (e) => {
-      const target = e.target;
-      const id = target.dataset.id;
-      if (!id) return;
-
-      if (target.classList.contains('open')) {
-        const ep = target.dataset.ep || 1;
-        // TODO: 마지막 회차가 아닌 '회차 목록' 페이지로 보내는 것이 더 좋을 수 있음
-        // 현재는 'novel.html'이 집필실이므로 마지막 회차로 이동
-        location.href = `novel.html?id=${id}&ep=${ep}`;
-
-      } else if (target.classList.contains('resources')) {
-        // [신규] 리소스 관리 페이지로 이동
-        location.href = `resource.html?id=${id}`;
-
-      } else if (target.classList.contains('del')) {
-        showModal({
-          title: '삭제 확인',
-          content: `정말로 '${id}' 소설을 삭제하시겠습니까? 되돌릴 수 없습니다.`,
-          buttons: [
-            { text: '취소', onClick: null, primary: false },
-            { 
-              text: '삭제', 
-              onClick: () => {
-                const next=loadNovels().filter(x=>x.id!==id);
-                saveNovels(next); 
-                showToast('소설이 삭제되었습니다.', 'success');
-                render();
-              }, 
-              primary: true 
-              // TODO: 버튼을 빨간색으로 (danger) 스타일링
-            }
-          ]
-        });
-      }
-    });
-  }
-
-  // [수정] 새 소설 만들기: prompt -> showModal
-  document.getElementById('addNovelButton').addEventListener('click', ()=>{
-    
-    // 모달에 들어갈 HTML 콘텐츠 생성
-    const modalContent = document.createElement('div');
-    modalContent.style.cssText = 'display:flex; flex-direction:column; gap:12px;';
-    
-    modalContent.innerHTML = `
-      <label for="modalNovelTitle" style="font-weight: 500;">소설 제목</label>
-      <input id="modalNovelTitle" placeholder="무제" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;">
-      <label for="modalNovelResources" style="font-weight: 500;">초기 리소스 (선택)</label>
-      <textarea id="modalNovelResources" rows="5" placeholder="간단한 초기 설정을 입력하세요.\n예: 주인공 (18세, 검사)\n(나중에 리소스 관리에서 자세히 편집할 수 있습니다.)" style="padding: 8px; border-radius: 6px; border: 1px solid #ccc;"></textarea>
-    `;
-
-    showModal({
-      title: '새 소설 생성',
-      content: modalContent,
-      buttons: [
-        { text: '취소', onClick: null, primary: false },
-        { 
-          text: '생성', 
-          onClick: () => {
-            const title = document.getElementById('modalNovelTitle').value || '무제';
-            const initialResources = document.getElementById('modalNovelResources').value;
-            
-            const now=Date.now(), id='nov_'+now;
-            const novel={ 
-              id, 
-              title, 
-              createdAt:now, 
-              updatedAt:now, 
-              // [신규] 리소스 구조 (마스터)
-              resources: {
-                characters: [],
-                places: [],
-                terms: [],
-                notes: initialResources // 초기 메모
-              }, 
-              episodes:[] 
-            };
-            
-            // 첫 회차 생성 (에피소드 스냅샷)
-            novel.episodes.push({ 
-              no: 1, 
-              title: '1화', 
-              content: '', 
-              updatedAt: now, 
-              // [신규] 회차 리소스 스냅샷 (초기엔 비어있음)
-              resources: {} 
-            });
-            
-            const arr=loadNovels(); arr.unshift(novel); saveNovels(arr);
-            showToast('새 소설이 생성되었습니다!', 'success');
-            
-            // 생성 후 리소스 관리 페이지로 이동 (설정부터 하도록 유도)
-            location.href = `resource.html?id=${id}`;
-          }, 
-          primary: true 
-        }
-      ]
-    });
-  });
-
-  render();
-</script>
+    <script type="module">
+        // 라우터를 임포트하여 앱 실행
+        import { initRouter } from './public/router.js';
+        initRouter();
+    </script>
 </body>
 </html>
