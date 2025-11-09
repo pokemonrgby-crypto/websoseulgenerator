@@ -106,7 +106,10 @@ export default async function handler(req, res) {
             throw new Error(`Gemini(${modelName}) 호출 실패: ${errorText}`);
         }
       }
-      const data = await gGres.json();
+      
+      // [수정] gGres -> gRes 로 오타 수정
+      const data = await gRes.json();
+      
       if (data.candidates && data.candidates[0]?.content?.parts) {
         resultText = data.candidates[0].content.parts.map(p => p.text || '').join('');
       } else if (data.candidates && data.candidates[0]?.finishReason === 'SAFETY') {
