@@ -38,10 +38,10 @@
       * `GEMINI_API_KEY`, `NOVELAI_API_KEY` 등 모든 외부 API 키는 **절대** 프론트엔드 코드에 포함시키지 않습니다.
       * 모든 키는 \*\*Vercel 대시보드의 "Environment Variables"\*\*에만 저장하며, 서버리스 함수 내에서 `process.env`를 통해서만 접근합니다.
   * **AI 모델 처리:**
-      * **NovelAI**: 항상 **최신/최상 모델** 사용 (환경변수 `NOVELAI_MODEL`로 관리, 기본값: `glm-4.6`)
+      * **NovelAI**: 항상 **최신/최상 모델** 사용 (환경변수 `NOVELAI_MODEL`로 관리, 기본값: `erato`)
       * **모델별 역할**:
         - SKETCH (스케치/간단 질의): `gemini-2.5-flash-lite`
-        - J_DRAFT/J_POLISH (본문 초안/다듬기): `NovelAI 최신 모델` - **일본어**
+        - J_DRAFT/J_POLISH (본문 초안/다듬기): `NovelAI Erato 모델` - **일본어**
         - TRANSLATE_KO (번역): `gemini-2.5-pro` - 일본어 → 한국어
       * **재시도 로직**: 429/5xx 오류 시 지수 백오프 (1s → 2s → 4s, 최대 3회)
       * AI가 생성할 필요 없는 고정 필드(예: `id`, `createdAt`, `authorId`)는 **반드시 서버리스 함수 내에서** 처리하여 JSON에 추가합니다.
@@ -53,8 +53,8 @@
         - `MY_SECRET_KEY`: 개인용 인증 키
         - `GEMINI_API_KEY`: Google Gemini API 키
         - `NOVELAI_API_KEY`: NovelAI API 키
-        - `NOVELAI_MODEL`: NovelAI 모델명 (기본값: `glm-4.6`, 최신 모델로 주기적 업데이트)
-        - `NOVELAI_MAX_LENGTH`: NovelAI 최대 생성 길이 (기본값: `4000`, 3000-4000자 목표)
+        - `NOVELAI_MODEL`: NovelAI 모델명 (기본값: `erato`, 최신 모델로 주기적 업데이트)
+        - `NOVELAI_MAX_LENGTH`: NovelAI 최대 생성 길이 (기본값: `2048`, 토큰 단위)
 
 -----
 
@@ -80,3 +80,236 @@
       * 글자와 배경의 **명암 대비**를 확실하게 하여 **가시성과 가독성**을 높입니다.
   * **사용자 경험 (UX):**
       * 기능 구현 전, 가상의 \*\*텍스트 시뮬레이션(시나리오)\*\*을 통해 사용 흐름에 불편함이 없는지 검토합니다.
+
+-----
+
+### 4\. 🤖 NovelAI Erato 모델 호출 상세 가이드
+
+#### 4.1. Erato 모델 개요
+
+**Erato**는 NovelAI의 최신 텍스트 생성 모델입니다. 이전 모델(Opus, Kayra 등)보다 향상된 자연어 생성 능력과 문맥 이해력을 제공하며, 특히 창작 콘텐츠 생성에 최적화되어 있습니다.
+
+#### 4.2. API 엔드포인트
+
+```
+POST https://text.novelai.net/ai/generate
+```
+
+**인증 방식:** Bearer Token
+- Authorization 헤더에 `Bearer ${NOVELAI_API_KEY}` 형식으로 포함
+
+#### 4.3. 요청 구조 (극도로 정밀한 명세)
+
+##### 4.3.1. HTTP 헤더
+
+```http
+Content-Type: application/json
+Authorization: Bearer ${NOVELAI_API_KEY}
+```
+
+##### 4.3.2. 요청 본문 (Request Body)
+
+```json
+{
+  "input": "프롬프트 텍스트",
+  "model": "erato",
+  "parameters": {
+    "max_length": 2048,
+    "min_length": 1,
+    "temperature": 1.0,
+    "top_p": 0.9,
+    "top_k": 0,
+    "tail_free_sampling": 0,
+    "repetition_penalty": 1.0,
+    "mirostat": 0
+  }
+}
+```
+
+##### 4.3.3. 파라미터 상세 설명
+
+| 파라미터 | 타입 | 필수 여부 | 기본값 | 설명 |
+|---------|------|----------|--------|------|
+| `input` | string | **필수** | - | 생성의 시작점이 되는 프롬프트 텍스트. 모델이 이 텍스트를 이어서 작성합니다. |
+| `model` | string | **필수** | - | 사용할 모델명. 반드시 `"erato"`로 설정해야 합니다. |
+| `parameters.max_length` | integer | 선택 | 2048 | 생성할 최대 토큰 수. 범위: 1~8192. 토큰은 대략 한글 1~2자, 영문 1단어에 해당합니다. |
+| `parameters.min_length` | integer | 선택 | 1 | 생성할 최소 토큰 수. 일반적으로 1로 설정합니다. |
+| `parameters.temperature` | float | 선택 | 1.0 | 생성의 무작위성을 제어합니다. 높을수록 창의적/다양하지만 일관성이 떨어질 수 있습니다. 범위: 0.1~2.0. 권장값: 0.7~1.2 |
+| `parameters.top_p` | float | 선택 | 0.9 | 누적 확률 샘플링. 상위 p% 확률의 토큰만 고려합니다. 범위: 0.0~1.0. 권장값: 0.85~0.95 |
+| `parameters.top_k` | integer | 선택 | 0 | 상위 k개의 토큰만 고려합니다. 0이면 비활성화됩니다. 범위: 0~100 |
+| `parameters.tail_free_sampling` | float | 선택 | 0 | 꼬리 자유 샘플링. 확률 분포의 꼬리를 잘라냅니다. 범위: 0.0~1.0. 일반적으로 0으로 설정 |
+| `parameters.repetition_penalty` | float | 선택 | 1.0 | 반복 억제 페널티. 1.0보다 크면 이미 나온 토큰의 재사용을 억제합니다. 범위: 1.0~1.5. 권장값: 1.0~1.1 |
+| `parameters.mirostat` | integer | 선택 | 0 | Mirostat 샘플링 모드. 0=비활성화, 1=Mirostat v1, 2=Mirostat v2. 일반적으로 0으로 설정 |
+
+#### 4.4. 응답 구조
+
+##### 4.4.1. 성공 응답 (200 OK)
+
+NovelAI Erato API는 다음과 같은 형식으로 응답할 수 있습니다:
+
+**형식 1: output 필드 사용**
+```json
+{
+  "output": "생성된 텍스트 내용..."
+}
+```
+
+**형식 2: output_text 필드 사용**
+```json
+{
+  "output_text": "생성된 텍스트 내용..."
+}
+```
+
+**형식 3: choices 배열 사용 (OpenAI 호환 형식)**
+```json
+{
+  "choices": [
+    {
+      "text": "생성된 텍스트 내용..."
+    }
+  ]
+}
+```
+
+우리의 `/api/generate.js`는 이 세 가지 형식을 모두 처리할 수 있도록 구현되어 있습니다.
+
+##### 4.4.2. 오류 응답
+
+**401 Unauthorized**: API 키가 잘못되었거나 만료됨
+```json
+{
+  "message": "Unauthorized"
+}
+```
+
+**429 Too Many Requests**: 요청 한도 초과
+```json
+{
+  "message": "Rate limit exceeded"
+}
+```
+
+**500 Internal Server Error**: 서버 내부 오류
+
+#### 4.5. 프로젝트 내 Erato 호출 흐름
+
+##### 4.5.1. 프론트엔드에서 호출
+
+```javascript
+// /public/api.js
+import { MODEL_FOR, callProxy } from './api.js';
+
+// NovelAI Erato 모델 사용 (일본어 본문 작성)
+const model = MODEL_FOR.J_DRAFT; // 'novelai'
+const prompt = "프롬프트 텍스트";
+const secretKey = localStorage.getItem('MY_SECRET_KEY');
+
+const response = await callProxy(model, prompt, secretKey);
+console.log(response.text); // 생성된 텍스트
+```
+
+##### 4.5.2. 백엔드 프록시 처리
+
+```javascript
+// /api/generate.js
+// model === 'novelai'인 경우 자동으로 Erato 호출
+
+const naiUrl = 'https://text.novelai.net/ai/generate';
+const response = await fetch(naiUrl, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${process.env.NOVELAI_API_KEY}`
+  },
+  body: JSON.stringify({
+    input: prompt,
+    model: process.env.NOVELAI_MODEL || 'erato',
+    parameters: {
+      max_length: parseInt(process.env.NOVELAI_MAX_LENGTH || '2048', 10),
+      min_length: 1,
+      temperature: 1.0,
+      top_p: 0.9,
+      top_k: 0,
+      tail_free_sampling: 0,
+      repetition_penalty: 1.0,
+      mirostat: 0
+    }
+  })
+});
+```
+
+#### 4.6. 환경 변수 설정
+
+Vercel 대시보드에서 다음 환경 변수를 설정해야 합니다:
+
+```bash
+NOVELAI_API_KEY=nai-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+NOVELAI_MODEL=erato
+NOVELAI_MAX_LENGTH=2048
+```
+
+#### 4.7. 사용 예시
+
+##### 예시 1: 기본 텍스트 생성
+
+**요청:**
+```json
+{
+  "input": "어느 조용한 마을에 소녀가 살고 있었다.",
+  "model": "erato",
+  "parameters": {
+    "max_length": 512,
+    "temperature": 1.0,
+    "top_p": 0.9
+  }
+}
+```
+
+**응답:**
+```json
+{
+  "output": "어느 조용한 마을에 소녀가 살고 있었다. 그녀의 이름은 루나였고, 언제나 밤하늘을 바라보며 꿈을 꾸곤 했다..."
+}
+```
+
+##### 예시 2: 일본어 소설 본문 작성 (프로젝트 실제 사용)
+
+**요청:**
+```json
+{
+  "input": "【等場人物】\n主人公: 田中太郎, 高校生, 内気な性格\n\n【要件】\n田中太郎が初めて告白するシーンを書いてください。",
+  "model": "erato",
+  "parameters": {
+    "max_length": 2048,
+    "temperature": 1.0,
+    "top_p": 0.9,
+    "repetition_penalty": 1.0
+  }
+}
+```
+
+**응답:**
+```json
+{
+  "output": "田中太郎は震える手でポケットから手紙を取り出した。「あの、これ…」彼の声は小さく、風に消えそうだった..."
+}
+```
+
+#### 4.8. 주의 사항 및 베스트 프랙티스
+
+1. **API 키 보안**: `NOVELAI_API_KEY`는 절대 프론트엔드 코드나 공개 저장소에 노출하지 마세요.
+2. **재시도 로직**: 429 오류 발생 시 지수 백오프(1s → 2s → 4s)로 재시도합니다.
+3. **토큰 계산**: `max_length`는 토큰 단위입니다. 한글 기준 대략 1토큰 = 1~2자입니다.
+4. **프롬프트 설계**: 명확하고 구체적인 지시사항을 포함하면 더 나은 결과를 얻을 수 있습니다.
+5. **모델 업데이트**: NovelAI가 새로운 모델을 출시하면 `NOVELAI_MODEL` 환경 변수를 업데이트하세요.
+
+#### 4.9. 트러블슈팅
+
+| 문제 | 원인 | 해결 방법 |
+|------|------|----------|
+| 401 Unauthorized | API 키 오류 | Vercel 환경 변수에서 `NOVELAI_API_KEY` 확인 |
+| 429 Too Many Requests | 요청 한도 초과 | 재시도 로직이 자동 작동. 잠시 후 다시 시도 |
+| 응답 없음 | 잘못된 모델명 | `model` 필드가 정확히 `"erato"`인지 확인 |
+| 짧은 응답 | max_length 너무 작음 | `NOVELAI_MAX_LENGTH`를 증가 (권장: 2048~4096) |
+| 반복적인 텍스트 | repetition_penalty 너무 낮음 | `repetition_penalty`를 1.05~1.1로 조정 |
