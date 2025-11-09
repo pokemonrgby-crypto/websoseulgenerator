@@ -9,17 +9,16 @@ const ALLOWED_MODELS = new Set([
   'novelai'
 ]);
 
-// NovelAI 최신/최상 모델 설정 (규칙 #0: 인터넷 검색 결과 반영)
-const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'glm-4-6'; 
-// Vercel 환경 변수(NOVELAI_MAX_LENGTH)를 우선으로 하되, 
-// 코드를 직접 배포할 경우의 기본값도 2048으로 설정합니다. (API 최대 4096)
-const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '2048', 10);
+// NovelAI: ERATO(Opus) 기본값
+const NAI_LATEST_MODEL = process.env.NOVELAI_MODEL || 'erato';
+// OpenAI 호환 스펙에서는 max_tokens 사용
+const NAI_MAX_TOKENS = parseInt(process.env.NOVELAI_MAX_TOKENS || '1024', 10);
 
 // (fetchWithRetry 함수는 이전과 동일)
 async function fetchWithRetry(url, options, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const response = await fetch(url, options); 
+      const response = await fetch(url, options);
       if (response.ok) return response;
       if (response.status === 429 || response.status >= 500) {
         if (i < maxRetries - 1) {
@@ -37,7 +36,7 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
-      throw err; 
+      throw err;
     }
   }
 }
@@ -98,15 +97,15 @@ export default async function handler(req, res) {
       if (!gRes.ok) {
         const errorText = await gRes.text();
         try {
-            const errorJson = JSON.parse(errorText);
-            throw new Error(errorJson.error?.message || errorText);
-        } catch(e) {
-            throw new Error(`Gemini(${modelName}) 호출 실패: ${errorText}`);
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.error?.message || errorText);
+        } catch (e) {
+          throw new Error(`Gemini(${modelName}) 호출 실패: ${errorText}`);
         }
       }
-      
+
       const data = await gRes.json();
-      
+
       if (data.candidates && data.candidates[0]?.content?.parts) {
         resultText = data.candidates[0].content.parts.map(p => p.text || '').join('');
       } else if (data.candidates && data.candidates[0]?.finishReason === 'SAFETY') {
@@ -120,45 +119,45 @@ export default async function handler(req, res) {
       if (!novelaiApiKey) {
         return res.status(500).json({ error: '서버 설정 오류: NovelAI API 키가 없습니다.' });
       }
-      
-      // OpenAI 호환 엔드포인트
-      const naiUrl = 'https://text.novelai.net/oa/v1/chat/completions'; 
-      
+
+      // OpenAI 호환 엔드포인트 (ERATO 대응)
+      const naiUrl = 'https://text.novelai.net/oa/v1/chat/completions';
+
       const nRes = await fetchWithRetry(naiUrl, {
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${novelaiApiKey}`
         },
-        // OpenAI 'messages' 형식 + NovelAI 고유 파라미터(max_length) 조합
         body: JSON.stringify({
-          model: NAI_LATEST_MODEL, // 'glm-4-6'
+          model: NAI_LATEST_MODEL, // 'erato' (Opus 전용)
           messages: [
             {
-              "role": "user",
-              "content": prompt
+              role: 'system',
+              content: 'You are Erato, a powerful storytelling model on NovelAI. Keep outputs coherent and long-form.'
+            },
+            {
+              role: 'user',
+              content: prompt
             }
           ],
-          // [수정] 500 오류 대응: 'max_tokens' 대신 NovelAI 고유 파라미터 'max_length' 사용
-          temperature: 1.0,
-          max_length: NAI_MAX_LENGTH, // 2048 (Vercel 변수 우선)
-          min_length: 1 // (기존 코드에 있던 파라미터 복원)
+          temperature: 0.9,
+          max_tokens: NAI_MAX_TOKENS
+          // 필요 시 stop 추가 가능: stop: ['\n\n']
         })
       });
 
       if (!nRes.ok) {
         const t = await nRes.text();
-        // [개선] 500 오류를 명확히 전달
-         try {
-             const errorJson = JSON.parse(t);
-             throw new Error(`NovelAI 호출 실패 (${nRes.status}): ${errorJson.message || t}`);
-         } catch(e) { 
-             throw new Error(`NovelAI 호출 실패 (${nRes.status}): ${t}`); 
-         }
+        try {
+          const errorJson = JSON.parse(t);
+          throw new Error(`NovelAI 호출 실패 (${nRes.status}): ${errorJson.message || t}`);
+        } catch (e) {
+          throw new Error(`NovelAI 호출 실패 (${nRes.status}): ${t}`);
+        }
       }
       const nData = await nRes.json();
 
-      // OpenAI 호환 응답 구조(choices)에서 텍스트 추출
       if (nData.choices && nData.choices[0]?.message?.content) {
         resultText = nData.choices[0].message.content;
       } else {
@@ -170,7 +169,7 @@ export default async function handler(req, res) {
     }
 
     // 4) 응답
-    return res.status(200).json({ success:true, model, text: resultText });
+    return res.status(200).json({ success: true, model, text: resultText });
 
   } catch (err) {
     console.error('Proxy 오류:', err);
