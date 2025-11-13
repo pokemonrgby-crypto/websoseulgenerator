@@ -171,11 +171,20 @@
         }
         .field { display: flex; gap: 4px; align-items: center; }
         .field input.key { flex: 1; }
-        .field input.value { flex: 2; }
+        /* [수정] .field input.value -> .field textarea.value */
+        .field textarea.value { 
+            flex: 2; 
+            /* [신규] textarea 높이 자동조절을 위해 min-height 추가 */
+            min-height: 38px; /* padding 10*2 + line-height (approx 18) */
+            height: 38px;
+            resize: none;
+            overflow-y: hidden; /* 스크롤바 숨김 */
+        }
         .field button.del-field {
             background: #4a272c; color: #ffc2c2; border: 1px solid #dc3545;
             padding: 0 8px; font-size: 14px; border-radius: 4px;
             height: 30px;
+            min-width: 30px; /* [신규] 버튼 최소 너비 */
         }
         .card-actions { display: flex; gap: 8px; margin-top: 8px; }
         .card-actions button { font-size: 12px; padding: 6px 10px; }
@@ -184,7 +193,8 @@
 <body>
 
     <div id="keybar">
-        <strong style="color: var(--text-primary);">🔑 경비실 키</strong>
+        <!-- [수정] 규칙 #3: 이모지 -> 텍스트 -->
+        <strong style="color: var(--text-primary);">[키] 경비실 키</strong>
         <input id="secretKeyInput" placeholder="MY_SECRET_KEY" style="flex:1;max-width:360px;">
         <button id="saveSecretKeyButton">저장</button>
         <button id="deleteSecretKeyButton" class="secondary">삭제</button>
