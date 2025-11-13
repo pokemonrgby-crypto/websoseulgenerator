@@ -17,6 +17,7 @@ export const MODEL_FOR = {
  * @returns {Promise<object>} - API 응답 JSON
  */
 export async function callProxy(model, prompt, secretKey) {
+    // [수정] Vercel 배포 환경을 고려하여 /api/generate 절대 경로 사용
     const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-my-secret-key': secretKey },
