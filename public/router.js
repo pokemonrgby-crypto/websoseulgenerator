@@ -42,6 +42,13 @@ function parseHash() {
         });
     }
 
+    // [신규] #/novel/nov_123?ep=2 처리
+    // URLSearchParams가 ep=2를 이미 처리했지만, 명시적으로 ep 파라미터를 찾습니다.
+    const urlParams = new URLSearchParams(query);
+    if (urlParams.has('ep')) {
+        params.ep = urlParams.get('ep');
+    }
+
     return { route: routes[mainPath], params };
 }
 
