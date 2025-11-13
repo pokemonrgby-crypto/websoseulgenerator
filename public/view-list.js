@@ -120,7 +120,7 @@ function handleCreateNovelClick() {
                 const title = document.getElementById('modalNovelTitle').value || '제목 없는 소설';
                 const notes = document.getElementById('modalNovelNotes').value || '';
                 
-                // 기본 리소스 구조에 메모 추가
+                // 기본 리소스 구조에 메모 추가 (규칙 #11)
                 const resources = { 
                     characters: [], 
                     places: [], 
@@ -135,7 +135,7 @@ function handleCreateNovelClick() {
                 
                 showToast('새 소설이 생성되었습니다!', 'success');
                 
-                // 생성된 소설의 1화 집필실로 바로 이동
+                // 생성된 소설의 1화 집필실로 바로 이동 (규칙 #10.4)
                 window.location.hash = `#/novel/${newNovel.id}?ep=1`;
               }, 
               primary: true 
@@ -156,7 +156,8 @@ export function initListView(container) {
     container.innerHTML = `
         <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h1>내 소설 목록</h1>
-            <button id="createNovelButton">✨ 새 소설 생성</button>
+            <!-- [수정] 규칙 #3: 이모지 -> 텍스트 -->
+            <button id="createNovelButton">[+] 새 소설 생성</button>
         </div>
         <div class="grid" id="novel-grid">
             </div>
