@@ -14,6 +14,11 @@ const NAI_LATEST_MODEL = (process.env.NOVELAI_MODEL || 'erato');
 // Erato 실제 제한: 150 토큰 (최대 170 토큰까지 문장 완성)
 // 환경변수 NOVELAI_MAX_LENGTH가 있으면 우선하되, 150을 초과하면 경고
 const NAI_MAX_LENGTH = parseInt(process.env.NOVELAI_MAX_LENGTH || '150', 10);
+// TODO (규칙 #12): 시스템 프롬프트는 3,000~4,000자(약 2,000토큰 이상)를 요구하나,
+// 현 모델(Erato)의 단일 호출 제한은 150-170 토큰(README 4.1 참조)으로 심각한 불일치가 있음.
+// 요구사항 충족을 위해서는 클라이언트 또는 서버에서 '이어쓰기' 방식의 반복 호출 로직 구현이 필수적임.
+// 현재는 150 토큰 제한을 유지함.
+
 
 // 공용 재시도 fetch
 async function fetchWithRetry(url, options, maxRetries = 3) {
@@ -134,7 +139,7 @@ export default async function handler(req, res) {
           input: prompt,
           model: NAI_LATEST_MODEL, // 'erato'
           parameters: {
-            max_length: NAI_MAX_LENGTH, // 기본 150, 실제 제한 150-170
+            max_length: NAI_MAX_LENGTH, // TODO: 3000-4000자 요구사항과 불일치 (위 TODO 참조)
             min_length: 1,
             temperature: 1.0,
             top_p: 0.9,
