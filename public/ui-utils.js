@@ -17,7 +17,7 @@ export function showToast(message, type = 'info', duration = 3000) {
       position: fixed;
       top: 20px;
       right: 20px;
-      z-index: 10000;
+      z-index: 10000; /* 규칙 #3: 모달(9000대)보다 높게 설정 */
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -30,7 +30,7 @@ export function showToast(message, type = 'info', duration = 3000) {
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   
-  // 타입별 색상
+  // 타입별 색상 (다크모드에 맞게 조정)
   const colors = {
     success: '#28a745',
     error: '#dc3545',
@@ -107,12 +107,12 @@ export function showModal(options) {
 
   // 현재 최상위 z-index 찾기 (규칙 #3: z-order 관리)
   const modals = document.querySelectorAll('.modal-overlay');
-  let maxZIndex = 9000;
+  let maxZIndex = 9000; // 모달 기본 z-index
   modals.forEach(modal => {
     const zIndex = parseInt(window.getComputedStyle(modal).zIndex);
     if (zIndex > maxZIndex) maxZIndex = zIndex;
   });
-  const newZIndex = maxZIndex + 10;
+  const newZIndex = maxZIndex + 10; // 새 모달은 위로
 
   // 오버레이 생성
   const overlay = document.createElement('div');
@@ -123,7 +123,7 @@ export function showModal(options) {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.6); /* 어둡게 */
     z-index: ${newZIndex};
     display: flex;
     align-items: center;
@@ -131,11 +131,13 @@ export function showModal(options) {
     animation: fadeIn 0.2s ease-out;
   `;
 
-  // 모달 컨테이너
+  // 모달 컨테이너 (다크모드 스타일 적용)
   const modal = document.createElement('div');
   modal.className = 'modal-container';
   modal.style.cssText = `
-    background: white;
+    background: var(--bg-dark-2); /* 다크모드 배경 */
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
     border-radius: 12px;
     padding: 24px;
     min-width: 300px;
@@ -152,7 +154,7 @@ export function showModal(options) {
   titleEl.style.cssText = `
     margin: 0 0 16px 0;
     font-size: 20px;
-    color: #222;
+    color: var(--text-primary);
   `;
   modal.appendChild(titleEl);
 
@@ -161,13 +163,19 @@ export function showModal(options) {
   contentEl.className = 'modal-content';
   contentEl.style.cssText = `
     margin-bottom: 20px;
-    color: #555;
+    color: var(--text-secondary);
     line-height: 1.5;
   `;
   if (typeof content === 'string') {
     contentEl.innerHTML = content;
   } else {
+    // [신규] 스타일 상속을 위해 모달 컨텐츠 내부 엘리먼트 스타일 조정
     contentEl.appendChild(content);
+    contentEl.querySelectorAll('input, textarea, select, label').forEach(el => {
+        el.style.color = 'var(--text-primary)';
+        if(el.tagName === 'LABEL') el.style.marginBottom = '4px';
+        if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.style.width = '100%';
+    });
   }
   modal.appendChild(contentEl);
 
@@ -192,17 +200,25 @@ export function showModal(options) {
   buttons.forEach(btn => {
     const button = document.createElement('button');
     button.textContent = btn.text;
+    // [수정] 다크모드 버튼 스타일 적용
     button.style.cssText = `
       padding: 10px 16px;
-      border: ${btn.primary ? '0' : '1px solid #ddd'};
+      border: ${btn.primary ? '0' : '1px solid var(--border-color)'};
       border-radius: 8px;
-      background: ${btn.primary ? '#007aff' : '#fff'};
-      color: ${btn.primary ? '#fff' : '#333'};
+      background: ${btn.primary ? 'var(--accent-blue)' : 'var(--bg-dark-3)'};
+      color: ${btn.primary ? '#fff' : 'var(--text-primary)'};
       cursor: pointer;
       font-size: 14px;
+      font-weight: 600;
     `;
-    button.onclick = () => {
-      if (btn.onClick) btn.onClick();
+    button.onclick = (e) => {
+      // [신규] 버튼 비활성화 (규칙 #3)
+      // 모달 닫기 전 작업이 오래 걸릴 수 있으므로 비활성화
+      button.disabled = true;
+      if (btn.onClick) {
+        // onClick이 Promise를 반환할 경우를 대비 (하지만 현재는 동기/닫기만)
+        btn.onClick(e);
+      }
       closeModal();
     };
     buttonArea.appendChild(button);
@@ -243,7 +259,7 @@ export function showModal(options) {
 }
 
 /**
- * 확인 모달 (예/아니오)
+ * 확인 모달 (예/아니오) (규칙 #3)
  * @param {string} message - 확인 메시지
  * @param {Function} onConfirm - 확인 시 콜백
  * @param {Function} onCancel - 취소 시 콜백
@@ -271,7 +287,7 @@ export function toggleButtonLoading(button, loading, loadingText = '처리 중..
     button.textContent = loadingText;
     button.disabled = true;
   } else {
-    // 버튼이 DOM에서 제거되었을 수 있음
+    // 버튼이 DOM에서 제거되었을 수 있음 (예: 뷰 전환)
     if (button) {
         button.textContent = button.dataset.originalText || button.textContent;
         button.disabled = false;
