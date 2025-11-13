@@ -9,10 +9,18 @@ const LS_KEY = 'novels';
 function load() { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; } }
 function save(arr) { localStorage.setItem(LS_KEY, JSON.stringify(arr)); }
 function getNovel(novelId) { return load().find(n => n.id === novelId); }
+/**
+ * 소설 객체와 회차 번호로 회차 객체를 찾습니다. (이전 회차 접근용 헬퍼)
+ * @param {object} n - 소설 객체
+ * @param {number} epNum - 회차 번호
+ * @returns {object | undefined} 회차 객체
+ */
 function getEpisode(n, epNum) { return (n.episodes || []).find(e => e.no === epNum); }
 
+
 // --- 렌더링 로직 ---
-let novel, episode, masterResources, lastJapaneseDraft = "";
+// [수정] masterResources -> currentResources (로드 시점의 리소스)
+let novel, episode, currentResources, lastJapaneseDraft = "";
 let secretKey = localStorage.getItem('MY_SECRET_KEY');
 
 function renderResourceList(type, data) {
@@ -33,14 +41,17 @@ function renderResourceList(type, data) {
 }
 
 function loadResources() {
-    renderResourceList('characters', masterResources.characters);
-    renderResourceList('places', masterResources.places);
-    renderResourceList('terms', masterResources.terms);
+    // [수정] currentResources 사용 (규칙 #11, #13)
+    renderResourceList('characters', currentResources.characters);
+    renderResourceList('places', currentResources.places);
+    renderResourceList('terms', currentResources.terms);
 }
 
 function loadEpisodeContent() {
     if (episode && episode.content) {
         const blocks = document.getElementById('novel-blocks');
+        // [수정] innerHTML 초기화 추가
+        blocks.innerHTML = ''; 
         episode.content.split(/\n\s*\n/).forEach(chunk => {
             const p = document.createElement('p');
             p.textContent = chunk || ' ';
@@ -58,7 +69,10 @@ function getFormattedResources() {
     checkedItems.forEach(check => {
         const type = check.dataset.type;
         const index = parseInt(check.dataset.index, 10);
-        grouped[type].push(masterResources[type][index]);
+        // [수정] currentResources 사용 (규칙 #11, #13)
+        if (currentResources[type] && currentResources[type][index]) {
+            grouped[type].push(currentResources[type][index]);
+        }
     });
     if (grouped.characters.length > 0) resourceText += "【등장인물】\n" + grouped.characters.map(item => JSON.stringify(item)).join('\n') + "\n\n";
     if (grouped.places.length > 0) resourceText += "【배경/장소】\n" + grouped.places.map(item => JSON.stringify(item)).join('\n') + "\n\n";
@@ -66,18 +80,42 @@ function getFormattedResources() {
     return resourceText.trim();
 }
 
+/**
+ * [신규] 이전 회차 내용(연속성)을 프롬프트에 추가 (규칙 #12.5)
+ */
+function getPreviousEpisodeContext() {
+    if (!novel || !episode || episode.no <= 1) {
+        return "";
+    }
+    const prevEpisode = getEpisode(novel, episode.no - 1);
+    if (prevEpisode && prevEpisode.content) {
+        // 간단히 마지막 500자만 잘라서 제공 (한국어 본문 기준)
+        const context = prevEpisode.content.slice(-500); 
+        return `【이전 화 내용 (참고용)】\n${context}\n\n`;
+    }
+    return "";
+}
+
+
 function buildPrompt(stage, userText, resourceText = "") {
     const resourceBlock = resourceText ? `【참고 리소스】\n${resourceText}\n\n` : "";
     
+    // [신규] 이전 화 내용 (규칙 #12.5)
+    // J_DRAFT 또는 J_POLISH 단계에서만 이전 화 내용을 참조
+    const prevContextBlock = (stage === 'J_DRAFT' || stage === 'J_POLISH') ? getPreviousEpisodeContext() : "";
+
     switch(stage){
       case 'SKETCH':
+        // TODO (규칙 #15): 지시 프롬프트(userText)가 부실할 경우, NAI-brief(또는 flash-lite)를 호출하여 
+        // '일본어 지시문(10~14행)'을 생성하고(A-SKETCH), 그 결과를 J_DRAFT의 userText로 사용하는 보강 로직 필요.
         return `${resourceBlock}너는 웹소설 기획 보조야. 아래 리소스와 요구사항을 바탕으로 갈등→전환→후폭풍 3단 구조로 정리해줘.\n요구사항:\n${userText}`;
       case 'J_DRAFT':
-        // [수정] Erato 실제 제한: 150 토큰 (최대 170 토큰)
-        // 한글 기준: 약 150-300자 정도 생성 가능
-        return `以下のリソースと要件に従って、日本語でウェブ小説の本文を執筆してください。\n\n${resourceBlock}【必須要件】\n- 最大出力: 約150トークン (約300文字程度)\n- 改行: 必ず \\n を使用\n- 文体: 会話中心, SFXは地の文 (例: 【SFX】～～)\n- 固有名詞・口調: リソースに基づき一貫性を保つ\n\n【要件】\n${userText}\n\n【禁止事項】\n- リソースと矛盾する内容`;
+        // [수정] prevContextBlock 추가
+        // TODO (규칙 #12): 현재 150 토큰 제한(api/generate.js)으로 인해 3,000~4,000자 생성 불가. 반복 호출 로직 필요.
+        return `以下のリソースと要件に従って、日本語でウェブ小説の本文を執筆してください。\n\n${resourceBlock}${prevContextBlock}【必須要件】\n- 最大出力: 約150トークン (約300文字程度)\n- 改行: 必ず \\n を使用\n- 文体: 会話中心, SFXは地の文 (例: 【SFX】～～)\n- 固有名詞・口調: リソースに基づき一貫性を保つ\n\n【要件】\n${userText}\n\n【禁止事項】\n- リソースと矛盾する内容`;
       case 'J_POLISH':
-        return `${resourceBlock}다음 리소스를 참고하여, 아래의 일본어 웹소설 본문을 추고(推敲)해주세요.\n【추고(推敲)의 방침】\n- 리소스와 일관성 유지\n- 의미는 바꾸지 않는다\n- 불필요한 표현 삭제\n- 문장의 리듬 개선\n\n【본문】\n${userText}`;
+        // [수정] prevContextBlock 추가
+        return `${resourceBlock}${prevContextBlock}다음 리소스를 참고하여, 아래의 일본어 웹소설 본문을 추고(推敲)해주세요.\n【추고(推敲)의 방침】\n- 리소스와 일관성 유지\n- 의미는 바꾸지 않는다\n- 불필요한 표현 삭제\n- 문장의 리듬 개선\n\n【본문】\n${userText}`;
       case 'TRANSLATE_KO':
         return `${resourceBlock}다음 리소스를 참고하여, 아래의 일본어 웹소설 본문을 자연스러운 한국어로 번역해줘.\n【번역 원칙】\n- 말맛/톤 유지\n- 리소스 고유명사 정확히 번역\n- 대화와 줄바꿈 살리기\n\n【일본어 본문】\n${userText}`;
       default:
@@ -96,8 +134,13 @@ async function handleGenerateClick(e) {
     const resourceText = getFormattedResources();
     const prompt = buildPrompt(stage, userText, resourceText);
 
+    // [수정] 버튼 텍스트 변경 (규칙 #3)
     toggleButtonLoading(generateBtn, true, '생성 중...');
     const sceneResultEl = document.getElementById('sceneResult');
+    
+    // TODO (규칙 #15): 같은 회차에서 동일 stage, 동일 userText, 동일 리소스 선택으로 호출 시
+    // 이전에 생성한 지시문/요약(SKETCH 결과) 또는 본문(J_DRAFT 결과)을 캐시하여 재사용하는 로직 필요.
+
     try {
         const data = await callProxy(model, prompt, secretKey);
         const text = data.text || '';
@@ -111,7 +154,8 @@ async function handleGenerateClick(e) {
         sceneResultEl.textContent = `오류: ${e.message}`;
         showToast(`오류: ${e.message}`, 'error', 5000);
     } finally {
-        toggleButtonLoading(generateBtn, false, '✨ 실행');
+        // [수정] 버튼 텍스트 변경 (규칙 #3)
+        toggleButtonLoading(generateBtn, false, '[생성] 실행');
     }
 }
 
@@ -145,9 +189,18 @@ function handleSaveContent() {
     ep.content = blocks.join('\n\n');
     ep.updatedAt = Date.now();
     n.updatedAt = Date.now();
+    
+    // [신규] 규칙 #13: 회차 저장 시 리소스 스냅샷 저장
+    // 현재 로드된 리소스(currentResources)를 회차 리소스로 저장 (Deep Copy)
+    ep.resources = JSON.parse(JSON.stringify(currentResources));
+    
+    // TODO (규칙 #13.2): 회차 리소스(ep.resources)의 변경 사항을 
+    // 소설 마스터 리소스(n.resources)로 역반영(동기화)하는 로직이 필요함.
+    // (예: "이 회차의 리소스 변경점을 마스터에 적용하기" 버튼)
+    // 현재는 회차 -> 마스터 반영 로직은 구현되지 않음.
+
     save(arr);
-    showToast('본문 저장 완료!', 'success');
-    // TODO: 회차 저장 시 리소스 스냅샷 저장 (규칙 #13)
+    showToast('본문 및 리소스 스냅샷 저장 완료!', 'success');
 }
 
 async function handleCopyClick() {
@@ -170,10 +223,22 @@ export function initNovelView(container, novelId, epNum) {
         container.innerHTML = '<h1>회차를 찾을 수 없습니다.</h1><a href="#/">목록으로</a>';
         return;
     }
-    masterResources = novel.resources || { characters: [], places: [], terms: [] };
+
+    // [수정] 규칙 #11.5, #13: 리소스 로드 우선순위 적용
+    // 1. 회차 스냅샷(episode.resources)이 있으면 사용
+    // 2. 없으면 소설 마스터(novel.resources)를 사용
+    if (episode.resources) {
+        currentResources = episode.resources;
+        console.log(`[${episode.no}화] 리소스 스냅샷 로드됨.`);
+    } else {
+        currentResources = novel.resources || { characters: [], places: [], terms: [], notes: "" };
+        console.log(`[${episode.no}화] 소설 마스터 리소스 로드됨 (스냅샷 없음).`);
+    }
+
     lastJapaneseDraft = "";
 
     // 2. 뷰 HTML 삽입
+    // [수정] 규칙 #3: 이모지 버튼 텍스트 변경
     container.innerHTML = `
         <div class="editor-layout">
             <div class="main-content">
@@ -187,17 +252,17 @@ export function initNovelView(container, novelId, epNum) {
                         <option value="J_POLISH">다듬기 (NAI Erato/일본어)</option>
                         <option value="TRANSLATE_KO">번역 (Gemini 2.5 Pro/일→한)</option>
                     </select>
-                    <button id="generateSceneButton">✨ 실행</button>
-                    <button id="copyJapaneseButton" class="sub" style="margin-left:8px;">🧷 원문(일본어) 복사</button>
-                    <button id="saveContentButton" class="sub" style="margin-left:8px;">💾 본문 저장</button>
+                    <button id="generateSceneButton">[생성] 실행</button>
+                    <button id="copyJapaneseButton" class="sub" style="margin-left:8px;">[복사] 원문(일본어)</button>
+                    <button id="saveContentButton" class="sub" style="margin-left:8px;">[저장] 본문+스냅샷</button>
                 </div>
                 <div class="blocks" id="novel-blocks"></div>
                 <pre id="sceneResult"></pre>
             </div>
             <div class="side">
                 <fieldset id="resource-injector" style="border:1px solid var(--border-color); border-radius:12px; padding:12px;">
-                    <legend style="font-weight: bold; padding: 0 5px; color: var(--text-primary);">리소스 주입</legend>
-                    <button id="editResourcesButton" class="resource" style="width: 100%; margin-bottom: 12px;">📚 리소스 관리 (새 탭)</button>
+                    <legend style="font-weight: bold; padding: 0 5px; color: var(--text-primary);">리소스 주입 (현재 회차 기준)</legend>
+                    <button id="editResourcesButton" class="resource" style="width: 100%; margin-bottom: 12px;">[관리] 리소스 관리 (새 탭)</button>
                     <strong>등장인물</strong>
                     <div id="characters-list" style="max-height: 150px; overflow-y: auto; padding: 5px; background: var(--bg-dark-1); border-radius: 6px; margin-top: 5px;"></div>
                     <br>
